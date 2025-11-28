@@ -146,10 +146,10 @@ std::vector<Object> integrate(std::vector<Object> objects, double t, double dt)
     for (double time = 0.0; time <= t; time += dt)
     {
         outfile << time << " " 
-                << objects[1].position.x << " " 
-                << objects[1].position.y << " "
-                << objects[1].velocity.x << " "
-                << objects[1].velocity.y << "\n";
+                << objects[0].position.x << " " 
+                << objects[0].position.y << " "
+                << objects[0].velocity.x << " "
+                << objects[0].velocity.y << "\n";
         objects = dopri5(objects, dt);
     }
 
