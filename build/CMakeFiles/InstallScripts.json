@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"/home/berlet/code/orbit-correction/build/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

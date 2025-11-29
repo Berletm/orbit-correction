@@ -1,0 +1,158 @@
+#include "model.hpp"
+#include <fstream>
+#include <iostream>
+
+const std::vector<std::vector<double>> alpha =
+{
+    {1.0/5.0},
+    {3.0/40.0, 9.0/40.0},
+    {44.0/45.0, -56.0/15.0, 32.0/9.0},
+    {19372.0/6561.0, -25360.0/2187.0,	64448.0/6561.0,	-212.0/729.0},
+    {9017.0/3168.0, -355.0/33.0, 46732.0/5247.0, 49.0/176.0, -5103.0/18656.0},
+    {35.0/384.0, 0, 500.0/1113.0, 125.0/192.0, 2187.0/6784.0, 11.0/84.0}
+};
+
+const std::vector<double> b = 
+{
+    35.0/384.0, 0.0, 500.0/1113.0, 125.0/192.0, -2187.0/6784.0, 11.0/84.0, 0.0
+};
+
+std::vector<Vec3d> compute_accelerations(const std::vector<Object>& objects)
+{
+    std::vector<Vec3d> accelerations(objects.size());
+
+    for (int i = 0; i < objects.size(); ++i)
+    {
+        for (int j = 0; j < objects.size(); ++j)
+        {
+            if (i == j) continue;
+
+            Vec3d radius    = (objects[j].position - objects[i].position);
+            double distance_sq = radius * radius;
+            double distance = std::sqrt(distance_sq);
+            if (distance < 1e-10) continue;
+
+            Vec3d direction = radius / distance;
+            accelerations[i] += G * objects[j].mass / distance_sq * direction;
+        }
+    }
+
+    return accelerations;
+}
+
+SystemState derivative(const SystemState& state, const std::vector<Object>& objects)
+{
+    SystemState deriv;
+
+    deriv.positions = state.velocities;
+
+    deriv.velocities = compute_accelerations(objects);
+
+    return deriv;
+}
+
+std::vector<Object> dopri5(std::vector<Object> objects, double dt=1e-3)
+{
+    SystemState initial_state;
+
+    for (const auto& obj: objects)
+    {
+        initial_state.positions.push_back(obj.position);
+        initial_state.velocities.push_back(obj.velocity);
+    }
+
+    SystemState k1 = derivative(initial_state, objects);
+
+
+    SystemState temp = initial_state + k1 * alpha[0][0] * dt;
+    SystemState k2 = derivative(temp, objects);
+
+    temp = initial_state + (
+        k1 * alpha[1][0] + 
+        k2 * alpha[1][1]) * dt;
+    SystemState k3 = derivative(temp, objects);
+
+    temp = initial_state + (
+        k1 * alpha[2][0] + 
+        k2 * alpha[2][1] + 
+        k3 * alpha[2][2]) * dt;
+    SystemState k4 = derivative(temp, objects);
+
+    temp = initial_state + (
+        k1 * alpha[3][0] + 
+        k2 * alpha[3][1] + 
+        k3 * alpha[3][2] + 
+        k4 * alpha[3][3]) * dt;
+    SystemState k5 = derivative(temp, objects);
+
+    temp = initial_state + (
+        k1 * alpha[4][0] + 
+        k2 * alpha[4][1] + 
+        k3 * alpha[4][2] + 
+        k4 * alpha[4][3] + 
+        k5 * alpha[4][4]) * dt;
+    SystemState k6 = derivative(temp, objects);
+
+    temp = initial_state + (
+        k1 * alpha[5][0] + 
+        k2 * alpha[5][1] + 
+        k3 * alpha[5][2] + 
+        k4 * alpha[5][3] + 
+        k5 * alpha[5][4] + 
+        k6 * alpha[5][5]) * dt;
+    SystemState k7 = derivative(temp, objects);
+
+    SystemState result;
+    result.positions.resize(objects.size());
+    result.velocities.resize(objects.size());
+
+    for (int i = 0; i < objects.size(); ++i)
+    {
+        result.positions[i] = initial_state.positions[i] + (
+            b[0] * k1.positions[i] +
+            b[1] * k2.positions[i] +
+            b[2] * k3.positions[i] +
+            b[3] * k4.positions[i] +
+            b[4] * k5.positions[i] +
+            b[5] * k6.positions[i] +
+            b[6] * k7.positions[i]
+        ) * dt;
+
+        result.velocities[i] = initial_state.velocities[i] + (
+            b[0] * k1.velocities[i] +
+            b[1] * k2.velocities[i] +
+            b[2] * k3.velocities[i] +
+            b[3] * k4.velocities[i] +
+            b[4] * k5.velocities[i] +
+            b[5] * k6.velocities[i] +
+            b[6] * k7.velocities[i]
+        ) * dt;
+    }
+
+    for (int i = 0; i < objects.size(); ++i)
+    {
+        objects[i].position = result.positions[i];
+        objects[i].velocity = result.velocities[i];
+    }
+
+    return objects;
+}
+
+std::vector<Object> integrate(std::vector<Object> objects, double t, double dt)
+{
+    std::ofstream outfile("orbit_data.txt");
+    outfile << "time(s) earth_x(m) earth_y(m) earth_vx(m/s) earth_vy(m/s)\n";
+
+    for (double time = 0.0; time <= t; time += dt)
+    {
+        outfile << time << " " 
+                << objects[0].position.x << " " 
+                << objects[0].position.y << " "
+                << objects[0].velocity.x << " "
+                << objects[0].velocity.y << "\n";
+        objects = dopri5(objects, dt);
+    }
+
+    outfile.close();
+    return objects;
+}
