@@ -1,0 +1,14 @@
+[
+{
+  "directory": "/home/berlet/code/orbit-correction/build",
+  "command": "/usr/bin/clang++ -I/home/berlet/code/orbit-correction/model/include -g -o CMakeFiles/orbit.dir/src/main.cpp.o -c /home/berlet/code/orbit-correction/model/src/main.cpp",
+  "file": "/home/berlet/code/orbit-correction/model/src/main.cpp",
+  "output": "/home/berlet/code/orbit-correction/build/CMakeFiles/orbit.dir/src/main.cpp.o"
+},
+{
+  "directory": "/home/berlet/code/orbit-correction/build",
+  "command": "/usr/bin/clang++ -I/home/berlet/code/orbit-correction/model/include -g -o CMakeFiles/orbit.dir/src/model.cpp.o -c /home/berlet/code/orbit-correction/model/src/model.cpp",
+  "file": "/home/berlet/code/orbit-correction/model/src/model.cpp",
+  "output": "/home/berlet/code/orbit-correction/build/CMakeFiles/orbit.dir/src/model.cpp.o"
+}
+]
