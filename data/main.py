@@ -3,14 +3,23 @@ import numpy as np
 from astropy.time import Time
 
 
-def obs2cart(long: float, cos: float, sin: float, r: float = 6371.0) -> tuple[float, float, float]:
-    long_rad = np.radians(long)
+def obs2cart(obs_time: Time, long: float, cos: float, sin: float, r: float = 6371.0) -> tuple[float, float, float]:
+    # ITRS coordinates (Earth-fixed)
+    long_rad = np.deg2rad(long)
+    X = cos * np.cos(long_rad)
+    Y = cos * np.sin(long_rad)
+    Z = sin
     
-    x = np.cos(long_rad) * cos * r
-    y = cos * np.sin(long_rad) * r
-    z = sin * r
-
-    return x, y, z
+    # Greenwich Sidereal Time (radians)
+    gst = np.deg2rad(obs_time.sidereal_time('mean', 'greenwich').value * 15.0)
+    
+    # Rotate from ITRS to GCRS (rotate by -gst around Z-axis)
+    cos_gst, sin_gst = np.cos(gst), np.sin(gst)
+    x = X * cos_gst + Y * sin_gst
+    y = -X * sin_gst + Y * cos_gst
+    z = Z
+    
+    return np.array([x, y, z]) * r
 
 def celestial2cart(ra: float, dec: float) -> tuple[float, float, float]:
     ra_rad  = np.radians(ra)
@@ -22,24 +31,37 @@ def celestial2cart(ra: float, dec: float) -> tuple[float, float, float]:
     
     return x, y, z
 
+def cart2celestial(x: float, y: float, z: float) -> tuple[float, float]:
+
+    r = np.sqrt(x**2 + y**2 + z**2)
+
+    x, y, z = x / r, y / r, z / r
+    
+    dec_rad = np.arcsin(z)
+    dec = np.degrees(dec_rad)
+    
+    ra_rad = np.arctan2(y, x)  
+    ra = np.degrees(ra_rad) % 360.0
+    
+    return ra, dec
+
 def utc2tdb(date_str: str) -> Time:
     year, month, day_frac = date_str.split()
     
     year = int(year)
     month = int(month)
-    day_whole = int(float(day_frac))
-    time_fraction = float(day_frac) - day_whole
+    day_frac = float(day_frac)
     
-    seconds = time_fraction * 24 * 60 * 60
-    hours = int(seconds / 3600)
-    minutes = int((seconds % 3600) / 60)
-    seconds = seconds % 60 
+    a = (14 - month) // 12
+    y = year + 4800 - a
+    m = month + 12*a - 3
     
-    iso = f"{year:04d}-{month:02d}-{day_whole:02d}T{hours:02d}:{minutes:02d}:{seconds:09.6f}"
+    # JD для 0h UTC
+    jd = (153*m + 2)//5 + 365*y + y//4 - y//100 + y//400 - 32045 + day_frac
     
-    date = Time(iso, format='isot', scale="utc")
+    t = Time(jd, format='jd', scale='utc')
     
-    return date.tdb
+    return t.tdb
   
 def jd2sec(jd_date: float, reference_jd: float = 2458000.5) -> float:
     return (jd_date - reference_jd) * 24 * 60 * 60
@@ -117,7 +139,7 @@ def magn2weight(magn: np.array) -> float:
 def obsobj2objgeo(obs: np.array, obj: np.array) -> np.array:
     obs_dir = np.array([vec / np.linalg.norm(vec) for vec in obs])
     
-    res = np.array([obs_dir[i] + obj[i] for i in range(len(obs))])
+    res = np.array([(obs_dir[i] + obj[i]) / np.linalg.norm(obs_dir[i] + obj[i]) for i in range(len(obs))])
     
     return res
 
@@ -143,7 +165,10 @@ def preproc_table(table: pd.DataFrame) -> pd.DataFrame:
     cos  = table["cos"].to_numpy()
     sin  = table["sin"].to_numpy()
     
-    carts = np.array([obs2cart(long[i], cos[i], sin[i]) for i in range(len(long))])
+    date_utc = table["date_utc"].to_numpy()
+    date_tdb = [utc2tdb(date_utc[i]) for i in range(len(date_utc))]
+    
+    carts = np.array([obs2cart(date_tdb[i], long[i], cos[i], sin[i]) for i in range(len(long))])
 
     x = carts[:, 0]
     y = carts[:, 1]
