@@ -32,16 +32,11 @@ def celestial2cart(ra: float, dec: float) -> tuple[float, float, float]:
     return x, y, z
 
 def cart2celestial(x: float, y: float, z: float) -> tuple[float, float]:
-
-    r = np.sqrt(x**2 + y**2 + z**2)
-
-    x, y, z = x / r, y / r, z / r
-    
-    dec_rad = np.arcsin(z)
+    dec_rad = np.arctan2(z, np.sqrt(x**2 + y**2)) # mb wrong -> arcsin(z)
     dec = np.degrees(dec_rad)
     
-    ra_rad = np.arctan2(y, x)  
-    ra = np.degrees(ra_rad) % 360.0
+    ra_rad = np.arctan2(y, x) # [-pi; +pi]
+    ra = np.degrees(ra_rad) % 360.0 # [0; 2pi]
     
     return ra, dec
 
@@ -52,19 +47,20 @@ def utc2tdb(date_str: str) -> Time:
     month = int(month)
     day_frac = float(day_frac)
     
-    a = (14 - month) // 12
-    y = year + 4800 - a
-    m = month + 12*a - 3
+    day_int = int(day_frac)
+    hour_frac = (day_frac - day_int) * 24.0
+    hour = int(hour_frac)
+    minute_frac = (hour_frac - hour) * 60.0
+    minute = int(minute_frac)
+    second = (minute_frac - minute) * 60.0
     
-    # JD для 0h UTC
-    jd = (153*m + 2)//5 + 365*y + y//4 - y//100 + y//400 - 32045 + day_frac
+    date_iso = f"{year:04d}-{month:02d}-{day_int:02d}T{hour:02d}:{minute:02d}:{second:06.3f}"
     
-    t = Time(jd, format='jd', scale='utc')
-    
+    t = Time(date_iso, format='isot', scale='utc')
     return t.tdb
   
 def jd2sec(jd_date: float, reference_jd: float = 2458000.5) -> float:
-    return (jd_date - reference_jd) * 24 * 60 * 60
+    return (jd_date - reference_jd) * 24.0 * 60.0 * 60.0
 
 def ra2angle(ra: str) -> float:
     hours, mins, secs = ra.split()
@@ -136,13 +132,6 @@ def magn2weight(magn: np.array) -> float:
     
     return weights
 
-def obsobj2objgeo(obs: np.array, obj: np.array) -> np.array:
-    obs_dir = np.array([vec / np.linalg.norm(vec) for vec in obs])
-    
-    res = np.array([(obs_dir[i] + obj[i]) / np.linalg.norm(obs_dir[i] + obj[i]) for i in range(len(obs))])
-    
-    return res
-
 def read_table() -> pd.DataFrame:
     colspecs_oumuamua  = [(0, 2), (4, 21), (23, 34), (36, 48), (49, 56), (57, 64), (66, None)]
     col_names_oumuamua = ["note1", "date_utc", "right_ascension", "declination", "magnitude_band", "obs_name", "code"]
@@ -187,7 +176,7 @@ def preproc_table(table: pd.DataFrame) -> pd.DataFrame:
     # observation time
     date_utc = table["date_utc"].to_numpy()
     
-    date_tdb = np.array([jd2sec(utc2tdb(date_utc[i]).jd) for i in range(len(date_utc))])
+    date_tdb = np.array([jd2sec(utc2tdb(date_utc[i]).jd, 0.0) for i in range(len(date_utc))])
     
     table.insert(0, "date_tdb", date_tdb)
     table.drop("date_utc", axis=1, inplace=True)
@@ -206,36 +195,12 @@ def preproc_table(table: pd.DataFrame) -> pd.DataFrame:
     table["right_ascension"] = ra_angle
     table["declination"] = dec_angle
     
-    cart_coords = np.array([celestial2cart(ra_angle[i], dec_angle[i]) for i in range(len(ra))])
-
-    table["x_obj"] = cart_coords[:, 0]
-    table["y_obj"] = cart_coords[:, 1]
-    table["z_obj"] = cart_coords[:, 2]
-    table.drop(columns=["right_ascension", "declination"], inplace=True)
-    
     # magnitude == weight for obs 
     magn_band = table["magnitude_band"].to_numpy()
     magn = np.array([band_conversion(magn_band[i]) for i in range(len(magn_band))])    
     weights = magn2weight(magn)
     table["magnitude_band"] = weights
     table.rename(columns={"magnitude_band": "weight"}, inplace=True)
-    
-    # obj coords to geocenter
-    x_obj, y_obj, z_obj = table["x_obj"].to_numpy(), table["y_obj"].to_numpy(), table["z_obj"].to_numpy()
-    obj_coords = np.column_stack((x_obj,y_obj, z_obj))
-    
-    x_obs, y_obs, z_obs = table["x_obs"].to_numpy(), table["y_obs"].to_numpy(), table["z_obs"].to_numpy()
-    obs_coords = np.column_stack((x_obs, y_obs, z_obs))
-
-    obj_geo = obsobj2objgeo(obs_coords, obj_coords)
-    
-    x, y, z = obj_geo[:, 0], obj_geo[:, 1], obj_geo[:, 2]
-    
-    table["x_obj"] = x
-    table["y_obj"] = y
-    table["z_obj"] = z
-    
-    table.drop(columns=["x_obs", "y_obs",  "z_obs"], inplace=True)
     
     return table
     
