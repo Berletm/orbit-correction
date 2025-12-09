@@ -1,0 +1,257 @@
+\documentclass[12pt]{article}
+\usepackage{amsmath}
+\usepackage[bottom=2cm, top=2cm]{geometry}
+
+\begin{document}
+\author{Berlet Maxim 3384}
+\title{Non-linear least squares method for Newton Gravity law using Gauss-Newton method}
+\maketitle
+
+\section{Newton's Gravity law (ODE)}
+\[
+\begin{aligned}
+\text{Newton's Second law} \\
+\vec{F} = m\vec{a} \Rightarrow \frac{d^2x}{dt^2} = \frac{\vec{F}}{m} \\\\
+\text{Newton's Gravity law}
+\end{aligned}
+\]
+
+\[
+\begin{aligned}
+\vec{F} = \frac{GMm}{r^2}\frac{\vec{r}}{r} = \frac{GMm}{r^3}\vec{r} \Rightarrow \frac{d^2x}{dt^2} = \frac{GM}{r^3}\vec{r}, \\
+\text{where} \ x = \overrightarrow{r(t)} = (x(t), y(t), z(t))
+\end{aligned}
+\]
+
+\[
+\begin{aligned}
+\frac{d^2 \vec{r}}{dt^2} = \frac{GM}{(x^2 + y^2 + z^2)^{\frac{3}{2}}} (x \ y \ z) \\\\
+\text{Split vector into scalar equations} \\
+\begin{cases}
+    \frac{d^2x}{dt^2} = \frac{GM}{(x^2 + y^2 + z^2)^{\frac{3}{2}}}x \\
+    \frac{d^2y}{dt^2} = \frac{GM}{(x^2 + y^2 + z^2)^{\frac{3}{2}}}y \\
+    \frac{d^2z}{dt^2} = \frac{GM}{(x^2 + y^2 + z^2)^{\frac{3}{2}}}z
+\end{cases}
+\end{aligned}
+\]
+
+\[
+\begin{aligned}
+\text{Make system first order ODE} \\
+\begin{cases}
+    \frac{dv_x}{dt} = \frac{GM}{(x^2 + y^2 + z^2)^{\frac{3}{2}}}x \\
+    \frac{dv_y}{dt} = \frac{GM}{(x^2 + y^2 + z^2)^{\frac{3}{2}}}y \\
+    \frac{dv_z}{dt} = \frac{GM}{(x^2 + y^2 + z^2)^{\frac{3}{2}}}z \\
+    \frac{dx}{dt}   = v_x \\
+    \frac{dy}{dt}   = v_y \\
+    \frac{dz}{dt}   = v_z \\
+\end{cases} \\
+\end{aligned}
+\]
+And for solving Cauchy problem add initial values: \\ $ v(t_0) = (v_{x_0}, v_{y_0}, v_{z_0}); \\ r(t_0) = (x_0, y_0, z_0).$
+
+\pagebreak
+
+\section{Gauss-Newton method}
+
+\[
+\begin{aligned}
+    \text{Regression model} \\
+    y_i = g(x(t_i), \ q) + \varepsilon_i
+\end{aligned}
+\]
+Where: 
+
+$y_i$ - row of observed values in $t_i$ moment,
+
+$\varepsilon_i \sim \mathcal{N}(0, \sigma^2) $ - row of errors in measurements,
+
+$g$ - nonlinear function that returns row of model values, 
+
+$x(t_i)$ - system state vector in moment $t_i$
+
+$q$ - reduction parameters (determines how we measure values)
+
+\[
+\begin{aligned}
+    \text{Dynamical System equation} \\
+\begin{cases}
+    \frac{dx}{dt} = F(x(t), \ p) \\ 
+    x(t_0) = x_0
+\end{cases}
+\end{aligned}
+\]
+Where: 
+
+$x(t)$ - system state in time $t$
+
+$p$    - dynamical parameters (e.g. GM, other constants)
+
+\[
+\begin{aligned}
+    \text{Residuals and regression parameters} \\
+    r_i = y_i - g(x(t_i), \ q) \\
+    \beta = (x_0 \ p \ q)
+\end{aligned}
+\]
+
+\[
+\boxed{
+\begin{aligned}
+    \text{Parameters optimization using least squares} \\
+    \sum_{i = 1}^N {r_i(\hat{\beta})^2} \to min \\
+    \hat{\beta}^{(s+1)} = \hat{\beta}^{(s)} - (J^TWJ)^{-1}J^TWr(\hat{\beta}^{(s)}) 
+\end{aligned}
+}
+\]
+Where:
+
+    J - Jacobian of residuals ($J_{ij} = \frac{\partial{r_i}}{\partial{\beta_j}}$)
+
+    W - weight matrix ($W = diag(\frac{1}{\sigma_1^2}, \dots, \frac{1}{\sigma_N^2})$)
+
+\[
+\begin{aligned}
+    \frac{\partial{r_i}}{\partial{\beta_j}} = \left(\frac{\partial{r_i}}{\partial{x_{0_j}}} \ \frac{\partial{r_i}}{\partial{p_j}} \ \frac{\partial{r_i}}{\partial{q_j}}\right) \\\\
+    \frac{\partial{r_i}}{\partial{q_j}} = - \frac{\partial{g(x(t_i), \ q)}}{\partial{q_j}} \\
+    \frac{\partial{r_i}}{\partial{p_j}} = - \frac{\partial{g(x(t_i), \ q)}}{\partial{x}} \frac{\partial{x}}{\partial{p_j}} \\
+    \frac{\partial{r_i}}{\partial{x_{0_j}}} = - \frac{\partial{g(x(t_i), \ q)}}{\partial{x}} \frac{\partial{x}}{\partial{x_{0_j}}} \\
+\end{aligned}
+\]
+
+\pagebreak
+
+Let's combine last two equations into one matrix $P \equiv (x_0 \ p) \Rightarrow Q(t) = \frac{\partial{x}}{\partial{P}} $
+
+\[
+\begin{aligned}
+    \text{Additional Dynamical equation} \\
+    \frac{d}{dt}\frac{\partial{x}}{\partial{P}} = \frac{\partial{F}}{\partial{P}} + \frac{\partial{F}}{\partial{x}}\frac{\partial{x}}{\partial{P}} \ \Rightarrow \ \frac{d}{dt}Q(t) = \frac{\partial{F}}{\partial{P}} + \frac{\partial{F}}{\partial{x}}Q(t) \\
+\end{aligned}
+\]
+\[
+Q(t_0) = 
+\begin{array}{c}
+\begin{bmatrix}
+1 & \cdots & 0 & 0 & \cdots & 0 \\
+\vdots & \ddots & \vdots & \vdots & \ddots & \vdots \\
+0 & \cdots & 1 & 0 & \cdots & 0
+\end{bmatrix} \\
+\begin{matrix}
+\underbrace{\hspace{1.5cm}}_{x_0} &
+\underbrace{\hspace{1.5cm}}_{p}
+\end{matrix}
+\end{array}
+\]
+
+\pagebreak
+
+\section{Newton law in Gauss-Newton method for Orbit correction}
+
+\[
+\begin{aligned}
+\text{Dynamical system (ODE)} \\
+\begin{cases}
+    F_1 = \frac{dv_x}{dt} = \frac{GM}{(x^2 + y^2 + z^2)^{\frac{3}{2}}}x \\
+    F_2 = \frac{dv_y}{dt} = \frac{GM}{(x^2 + y^2 + z^2)^{\frac{3}{2}}}y \\
+    F_3 = \frac{dv_z}{dt} = \frac{GM}{(x^2 + y^2 + z^2)^{\frac{3}{2}}}z \\
+    F_4 = \frac{dx}{dt}   = v_x \\
+    F_5 = \frac{dy}{dt}   = v_y \\
+    F_6 = \frac{dz}{dt}   = v_z \\
+    v(t_0) = (v_{x_0}, v_{y_0}, v_{z_0}) \\
+    r(t_0) = (x_0, y_0, z_0)
+\end{cases}
+\end{aligned}
+\]
+
+In this case we have $(x, y, z)$ as observed values therefore our nonlinear function $g(x(t)) = (x(t) \ y(t) \ z(t))$.
+Lets redefine state vector in function input as  \\ $\vec{s}(t) = (x(t) \ y(t) \ z(t) \ v_x(t) \ v_y(t) \ v_z(t))$ from state $\Rightarrow g(s(t)) = (x(t) \ y(t) \ z(t)) = \vec{r}(t)$
+We don't have any p or q parameters so differentiation much easier.
+
+\[
+\begin{aligned}
+    \frac{\partial{r_i}}{\partial{s_{0_j}}} = - \frac{\partial{g(s(t_i))}}{\partial{s}} \frac{\partial{s}}{\partial{s_{0_j}}} = 
+    \begin{array}{c}
+    \begin{bmatrix}
+        \frac{\partial{x}}{\partial{x}} \ \frac{\partial{x}}{\partial{y}} \ \frac{\partial{x}}{\partial{z}} \ \frac{\partial{x}}{\partial{v_x}} \ \frac{\partial{x}}{\partial{v_y}} \ \frac{\partial{x}}{\partial{v_z}} \\
+        \frac{\partial{y}}{\partial{y}} \ \frac{\partial{y}}{\partial{y}} \ \frac{\partial{y}}{\partial{z}} \ \frac{\partial{y}}{\partial{v_x}} \ \frac{\partial{y}}{\partial{v_y}} \ \frac{\partial{y}}{\partial{v_z}} \\
+        \frac{\partial{z}}{\partial{z}} \ \frac{\partial{z}}{\partial{z}} \ \frac{\partial{z}}{\partial{z}} \ \frac{\partial{z}}{\partial{v_x}} \ \frac{\partial{z}}{\partial{v_y}} \ \frac{\partial{z}}{\partial{v_z}} \\
+    \end{bmatrix}
+    \end{array} \frac{\partial{s}}{\partial{s_{0_j}}} = 
+    \begin{array}{c}
+    \begin{bmatrix}
+        1 & 0 & 0 & \cdots & 0 \\ 
+        0 & 1 & 0 & \cdots & 0 \\
+        0 & 0 & 1 & \cdots & 0
+    \end{bmatrix}
+    \end{array} \frac{\partial{s}}{\partial{s_{0_j}}}
+\end{aligned} 
+\]
+
+
+And now to find last component $Q(t) = \frac{\partial{s}}{\partial{s_{0_j}}}$ we need to integrate one more equation
+\[
+\begin{aligned}
+    \frac{d}{dt}Q(t) = \frac{\partial{F}}{\partial{s_0}} + \frac{\partial{F}}{\partial{s}}Q(t)
+\end{aligned}
+\]
+\[
+Q(t_0) = 
+\begin{array}{c}
+\begin{bmatrix}
+1 & \cdots & 0 & 0 & \cdots & 0 \\
+\vdots & \ddots & \vdots & \vdots & \ddots & \vdots \\
+0 & \cdots & 1 & 0 & \cdots & 0
+\end{bmatrix} \\
+\begin{matrix}
+\underbrace{\hspace{1.5cm}}_{s_0} &
+\underbrace{\hspace{1.5cm}}_{p}
+\end{matrix}
+\end{array} = \begin{array}{c}
+\begin{bmatrix}
+1 & 0 & 0  \\
+0 & 1 & 0  \\
+0 & 0 & 1 
+\end{bmatrix} \end{array} \\
+\]
+
+In that case first term equals 0 and we have simplified equation
+
+\[
+\begin{aligned}
+    \frac{d}{dt}Q(t) = \frac{\partial{F}}{\partial{s}}Q(t)
+\end{aligned}
+\]
+
+Lets find out what's $\frac{\partial{F}}{\partial{s}}$ equals to.
+
+\[
+\begin{aligned}
+    \frac{\partial{F}}{\partial{s}} = 
+    \begin{array}{c}
+    \begin{bmatrix}
+        \frac{\partial{F_1}}{\partial{x}} & \frac{\partial{F_1}}{\partial{y}} & \frac{\partial{F_1}}{\partial{z}} & \frac{\partial{F_1}}{\partial{v_x}} & \frac{\partial{F_1}}{\partial{v_y}} & \frac{\partial{F_1}}{\partial{v_z}} \\
+        \frac{\partial{F_2}}{\partial{x}} & \frac{\partial{F_2}}{\partial{y}} & \frac{\partial{F_2}}{\partial{z}} & \frac{\partial{F_2}}{\partial{v_x}} & \frac{\partial{F_2}}{\partial{v_y}} & \frac{\partial{F_2}}{\partial{v_z}} \\
+        \frac{\partial{F_3}}{\partial{x}} & \frac{\partial{F_3}}{\partial{y}} & \frac{\partial{F_3}}{\partial{z}} & \frac{\partial{F_3}}{\partial{v_x}} & \frac{\partial{F_3}}{\partial{v_y}} & \frac{\partial{F_3}}{\partial{v_z}} \\
+        \frac{\partial{F_4}}{\partial{x}} & \frac{\partial{F_4}}{\partial{y}} & \frac{\partial{F_4}}{\partial{z}} & \frac{\partial{F_4}}{\partial{v_x}} & \frac{\partial{F_4}}{\partial{v_y}} & \frac{\partial{F_4}}{\partial{v_z}} \\
+        \frac{\partial{F_5}}{\partial{x}} & \frac{\partial{F_5}}{\partial{y}} & \frac{\partial{F_5}}{\partial{z}} & \frac{\partial{F_5}}{\partial{v_x}} & \frac{\partial{F_5}}{\partial{v_y}} & \frac{\partial{F_5}}{\partial{v_z}} \\
+        \frac{\partial{F_6}}{\partial{x}} & \frac{\partial{F_6}}{\partial{y}} & \frac{\partial{F_6}}{\partial{z}} & \frac{\partial{F_6}}{\partial{v_x}} & \frac{\partial{F_6}}{\partial{v_y}} & \frac{\partial{F_6}}{\partial{v_z}} \\
+    \end{bmatrix}
+    \end{array} = \\\\ 
+    = 
+    \begin{array}{c}
+    \begin{bmatrix}
+        \frac{GM}{(x^2 + y^2 + z^2)^{\frac{5}{2}}}(-2x^2 + y^2 + z^2) & \frac{GM}{(x^2 + y^2 + z^2)^{\frac{5}{2}}}(-3xy) & \frac{GM}{(x^2 + y^2 + z^2)^{\frac{5}{2}}}(-3xz) &  0 & 0 & 0\\
+        \frac{GM}{(x^2 + y^2 + z^2)^{\frac{5}{2}}}(-3yx) & \frac{GM}{(x^2 + y^2 + z^2)^{\frac{5}{2}}}(x^2 - 2y^2 + z^2) & \frac{GM}{(x^2 + y^2 + z^2)^{\frac{5}{2}}}(-3yz) &  0 & 0 & 0\\
+        \frac{GM}{(x^2 + y^2 + z^2)^{\frac{5}{2}}}(-3zx) & \frac{GM}{(x^2 + y^2 + z^2)^{\frac{5}{2}}}(-3zy) & \frac{GM}{(x^2 + y^2 + z^2)^{\frac{5}{2}}}(x^2 + y^2 - 2z^2) &  0 & 0 & 0\\
+        0 & 0 & 0 &  1 & 0 & 0\\
+        0 & 0 & 0 &  0 & 1 & 0\\
+        0 & 0 & 0 &  0 & 0 & 1\\
+    \end{bmatrix}
+    \end{array}
+\end{aligned}
+\]
+
+$\frac{\partial{v_x}}{\partial{x}} = 0$ \ same for $y, z$
+
+\end{document}

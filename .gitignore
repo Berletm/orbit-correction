@@ -1,3 +1,6 @@
 .vscode
 build
 visualization
+*.aux
+*.log
+*.gz
