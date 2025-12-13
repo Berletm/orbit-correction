@@ -40,6 +40,11 @@ std::vector<Vec3d> compute_accelerations(const std::vector<Object>& objects)
     return accelerations;
 }
 
+Matrix compute_change_rate()
+{
+    
+}
+
 SystemState derivative(const SystemState& state, const std::vector<Object>& objects)
 {
     SystemState deriv;
@@ -140,19 +145,10 @@ std::vector<Object> dopri5(std::vector<Object> objects, double dt=1e-3)
 
 std::vector<Object> integrate(std::vector<Object> objects, double t, double dt)
 {
-    std::ofstream outfile("orbit_data.txt");
-    outfile << "time(s) earth_x(m) earth_y(m) earth_vx(m/s) earth_vy(m/s)\n";
-
     for (double time = 0.0; time <= t; time += dt)
     {
-        outfile << time << " " 
-                << objects[0].position.x << " " 
-                << objects[0].position.y << " "
-                << objects[0].velocity.x << " "
-                << objects[0].velocity.y << "\n";
         objects = dopri5(objects, dt);
     }
 
-    outfile.close();
     return objects;
 }

@@ -61,10 +61,78 @@ inline Vec3d operator*(double scalar, const Vec3d& vec)
     return Vec3d(vec.x * scalar, vec.y * scalar, vec.z * scalar);
 }
 
+struct Celestial
+{
+    double ra, dec;
+    inline Celestial(double ra, double dec): ra(ra), dec(dec) {}
+
+    inline Celestial operator-(const Celestial& other) const
+    {
+        return Celestial(this->ra - other.ra, this->dec - other.dec);
+    }
+};
+
+struct Matrix
+{
+    std::vector<std::vector<double>> mat;
+    int cols, rows;
+
+    Matrix(int cols, int rows): cols(cols), rows(rows)
+    {
+        mat.resize(rows);
+
+        for (auto& row: mat)
+        {
+            row.resize(cols, 0);
+        }
+    }
+
+    Matrix(int size): cols(size), rows(size)
+    {
+        Matrix(size, size);
+    }
+
+    inline void identity()
+    {
+        for (int i = 0; i < rows; ++i)
+        {
+            mat[i][i] = 1;
+        }
+    }
+
+    inline void zeros()
+    {
+        for (auto& row: mat)
+        {
+            std::fill(row.begin(), row.end(), 0);
+        }
+    }
+
+    inline Matrix operator*(const Matrix& other) const
+    {   // (n * k) * (k * p) = (n * p)
+        Matrix res(this->rows, other.cols);
+
+        for (int i = 0; i < this->rows; ++i)
+        {
+            for (int j = 0; j < other.cols; ++j)
+            {
+                for (int k = 0; k < other.rows; ++k)
+                {
+                    res.mat[i][j] += this->mat[i][k] * other.mat[k][j];
+                }
+            }
+        }
+    }
+
+};
+
 struct SystemState
 {
     std::vector<Vec3d> positions;
     std::vector<Vec3d> velocities;
+    Matrix change_rate;
+
+    SystemState(): change_rate(3) { change_rate.identity(); }
 
     SystemState operator+(const SystemState& other)
     {
