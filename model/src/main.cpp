@@ -81,10 +81,5 @@ int main(int argc, char* argv[])
     std::vector<Object> system = create_model_system();
 
 
-    double total_time = 366 * 24 * 3600;
-    double dt = 3600 * 24;
-
-    integrate(system, total_time, dt);
-
     return 0;
 }

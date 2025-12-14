@@ -77,7 +77,7 @@ struct Matrix
     std::vector<std::vector<double>> mat;
     int cols, rows;
 
-    Matrix(int cols, int rows): cols(cols), rows(rows)
+    Matrix(int rows, int cols): cols(cols), rows(rows)
     {
         mat.resize(rows);
 
@@ -87,10 +87,7 @@ struct Matrix
         }
     }
 
-    Matrix(int size): cols(size), rows(size)
-    {
-        Matrix(size, size);
-    }
+    Matrix(int size): Matrix(size, size) {}
 
     inline void identity()
     {
@@ -114,16 +111,63 @@ struct Matrix
 
         for (int i = 0; i < this->rows; ++i)
         {
-            for (int j = 0; j < other.cols; ++j)
+            for (int j = 0; j < other.cols; ++j) 
             {
-                for (int k = 0; k < other.rows; ++k)
+                for (int k = 0; k < this->cols; ++k) 
                 {
                     res.mat[i][j] += this->mat[i][k] * other.mat[k][j];
                 }
             }
         }
+
+        return res;
     }
 
+    inline Matrix operator+(const Matrix& other) const
+    {
+        Matrix res(this->rows, this->cols);
+
+        for (int i = 0; i < this->rows; ++i)
+        {
+            for (int j = 0; j < this->cols; ++j)
+            {
+                res.mat[i][j] = this->mat[i][j] + other.mat[i][j];
+            }
+        }
+
+        return res;
+    }
+
+    inline Matrix operator*(double scalar) const
+    {
+        Matrix res(this->rows, this->cols);
+
+        for (int i = 0; i < this->rows; ++i)
+        {
+            for (int j = 0; j < this->cols; ++j)
+            {
+                res.mat[i][j] = scalar * this->mat[i][j];
+            }
+        }
+
+        return res;
+    }
+
+    inline void transpose()
+    {
+        Matrix res(this->cols, this->rows);
+
+        for (int i = 0; i < this->rows; ++i)
+        {
+            for (int j = 0; j < this->cols; ++j)
+            {
+                res.mat[j][i] = this->mat[i][j];
+            }
+        }
+
+        mat = std::move(res.mat);
+        std::swap(rows, cols);
+    }
 };
 
 struct SystemState
@@ -131,14 +175,16 @@ struct SystemState
     std::vector<Vec3d> positions;
     std::vector<Vec3d> velocities;
     Matrix change_rate;
+    double time;
 
-    SystemState(): change_rate(3) { change_rate.identity(); }
+    SystemState(): change_rate(3), time(0) {}
 
     SystemState operator+(const SystemState& other)
     {
         SystemState res;
         res.positions.resize(positions.size());
         res.velocities.resize(velocities.size());
+        res.change_rate = this->change_rate + other.change_rate;
 
         for (int i = 0; i < positions.size(); ++i)
         {
@@ -154,6 +200,7 @@ struct SystemState
         SystemState res;
         res.positions.resize(positions.size());
         res.velocities.resize(velocities.size());
+        res.change_rate = this->change_rate * scalar;
 
         for (int i = 0; i < positions.size(); ++i)
         {

@@ -8,10 +8,17 @@
 
 std::vector<Vec3d> compute_accelerations(const std::vector<Object>& objects);
 
+Matrix compute_gravitational_gradient(const std::vector<Object>& objects);
+
 Matrix compute_change_rate(const std::vector<Object>& objects, const Matrix& change_rate);
 
-std::vector<Object> dopri5(std::vector<Object> objects, double dt);
+std::vector<Object> dopri5(std::vector<Object> objects, SystemState& state, double dt);
 
-std::vector<Object> integrate(std::vector<Object> objects, double t, double dt);
+void integrate(
+    std::vector<Object> objects,
+    std::vector<SystemState>& states,
+    std::vector<std::vector<Object>>& objects_trajectories,
+    const Matrix& change_rate_init, 
+    double t, double dt);
 
 #endif // MODEL_HPP

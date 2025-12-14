@@ -1,5 +1,8 @@
 #include "correction.hpp"
+#include "model.hpp"
+#include "interpolation.hpp"
 #include <cmath>
+#include <algorithm>
 
 std::vector<Celestial> calculate_residuals(const std::vector<Celestial>& observed, const std::vector<Celestial>& computed)
 {
@@ -29,4 +32,228 @@ std::vector<Celestial> cart2celestial(const std::vector<Vec3d>& coords)
     }
     
     return res;
+}
+
+Matrix calculate_state_change(const Vec3d& computed)
+{
+    Matrix res(2, 3);
+
+    double general = pow(computed.x, 2) + pow(computed.y, 2);
+    double dist_sq = computed * computed;
+    res.mat[0][0] = - computed.y / general;
+    res.mat[0][1] = computed.x / general;
+    res.mat[0][2] = 0;
+
+    res.mat[1][0] = - computed.x * computed.z / (sqrt(general) * dist_sq);
+    res.mat[1][1] = - computed.y * computed.z / (sqrt(general) * dist_sq);
+    res.mat[1][2] = sqrt(general) / dist_sq;
+
+    return res;
+}
+
+Matrix calculate_jacobian(const Matrix& state_change, const Matrix& change_rate)
+{
+    Matrix j = state_change * change_rate;
+
+    return j;
+}
+
+Matrix stack_matrix(const std::vector<Matrix>& matrices)
+{
+    Matrix res(matrices[0].rows * matrices.size(), matrices[0].cols);
+
+    for (int idx = 0; idx < matrices.size(); ++idx)
+    {
+        Matrix mat = matrices[idx];
+        int shift = idx * mat.rows;
+
+        for (int i = 0; i < mat.rows; ++i)
+        {
+            for (int j = 0; j < mat.cols; ++j)
+            {
+                res.mat[shift + i][j] = mat.mat[i][j];
+            }
+        }
+    }
+
+    return res;
+}
+
+Matrix stack_vector(const std::vector<Celestial>& vecs)
+{
+    Matrix res(2 * vecs.size(), 1);
+
+    for (int i = 0; i < vecs.size(); ++i)
+    {   
+        int shift = i * 2;
+        Celestial cur_vec = vecs[i];
+
+        res.mat[0 + shift][0] = cur_vec.ra; 
+        res.mat[1 + shift][0] = cur_vec.dec;
+    }
+
+    return res;
+}
+
+Matrix solve(const Matrix& A, const Matrix& b)
+{
+
+}
+
+Matrix recompute_change_rate(
+    const Matrix& ref_state_change, 
+    double time_target, double time_ref, 
+    const std::vector<Object>& objects
+)
+{
+    Matrix initial_state = ref_state_change;
+    
+    double dt = time_target - time_ref;
+    int steps = std::max(1, (int)std::ceil(std::abs(dt) / 1e-3));  // h = 1e-3
+    double step_dt = dt / steps;
+
+    std::vector<SystemState> states;
+    std::vector<std::vector<Object>> object_trajectories;
+    integrate(objects, states, object_trajectories, ref_state_change, dt, step_dt);
+
+    return states.back().change_rate;
+}
+
+SystemState interpolate(const std::vector<std::vector<Object>>& object_trajectories, const std::vector<SystemState>& trajectory, double t)
+{
+    std::vector<Vec3d> oumuamua_trajectory;
+    std::vector<Vec3d> earth_trajectory;
+    std::vector<Vec3d> sun_trajectory;
+    std::vector<Vec3d> jupiter_trajectory;
+    std::vector<double> times;
+
+    for (const auto& state: trajectory)
+    {
+        oumuamua_trajectory.push_back(state.positions[0]);
+        sun_trajectory.push_back(state.positions[1]);
+        jupiter_trajectory.push_back(state.positions[2]);
+        earth_trajectory.push_back(state.positions[3]);
+        times.push_back(state.time);
+    }
+
+    Interpolator oumuamua_interpolator(oumuamua_trajectory, times);
+    Interpolator earth_interpolator(earth_trajectory, times);
+    Interpolator sun_interpolator(sun_trajectory, times);
+    Interpolator jupiter_interpolator(jupiter_trajectory, times);
+
+    SystemState res;
+
+    res.positions.push_back(oumuamua_interpolator.interpolate(t));
+    res.positions.push_back(sun_interpolator.interpolate(t));
+    res.positions.push_back(jupiter_interpolator.interpolate(t));
+    res.positions.push_back(earth_interpolator.interpolate(t));
+    
+    int i;
+    for (i = 0; i < trajectory.size() - 1; ++i)
+    {
+        if (trajectory[i].time < t && trajectory[i + 1].time > t)
+        {
+            break;
+        }
+    }
+
+    int i_ref;
+
+    if (i > trajectory.size()) i_ref = trajectory.size() - 1;
+    else if (i == 0) i_ref = 0;
+    else i_ref = i - 1;
+
+    auto obj_copy = object_trajectories[i_ref];
+
+    for (int i = 0; i < obj_copy.size(); ++i)
+    {
+        Object& obj = obj_copy[i];
+        obj.position = res.positions[i];
+    }
+    
+    Matrix change_rate = recompute_change_rate(trajectory[i_ref].change_rate, t, trajectory[i_ref].time, obj_copy);
+
+    res.change_rate = change_rate;
+
+    return res;
+}
+
+Vec3d mat2vec(const Matrix& mat)
+{
+    Vec3d res;
+
+    res.x = mat.mat[0][0];
+    res.y = mat.mat[1][0];
+    res.z = mat.mat[2][0];
+
+    return res;
+}
+
+void correction(std::vector<Object>& initial_state, const std::vector<Celestial>& observed, const std::vector<Vec3d>& obs_position, const std::vector<double>& obs_time)
+{   
+    Vec3d& params = initial_state[0].position;
+
+    double t_end = *std::max_element(obs_time.begin(), obs_time.end());
+
+    std::vector<SystemState> states;
+    std::vector<std::vector<Object>> objects_trajectories;
+    Matrix change_rate_init(3);
+    change_rate_init.identity();
+    integrate(initial_state, states, objects_trajectories, change_rate_init, t_end, 1e-3);
+
+    std::vector<SystemState> states_at_measurements;
+
+    for (const auto& time: obs_time)
+    {
+        SystemState state = interpolate(objects_trajectories, states, time);
+        states_at_measurements.push_back(state);
+    }
+
+    std::vector<Vec3d> computed;
+    for (int i = 0; i < states_at_measurements.size(); ++i)
+    {
+        SystemState state = states_at_measurements[i];
+        Vec3d observatory_vec = obs_position[i]; 
+
+        Vec3d oumuamua_pos = state.positions[0];
+        Vec3d earth_pos    = state.positions[1];
+
+        Vec3d temp_vec     =  earth_pos + observatory_vec;
+
+        Vec3d computed_vec = oumuamua_pos - temp_vec; // not sure about operands order 
+        computed.push_back(computed_vec);
+    }
+
+    std::vector<Celestial> computed_angles = cart2celestial(computed);
+
+    std::vector<Celestial> r = calculate_residuals(observed, computed_angles);
+
+    std::vector<Matrix> jacobians;
+
+    for (int i = 0; i < states_at_measurements.size(); ++i)
+    {
+        SystemState state = states_at_measurements[i];
+        Vec3d comp = computed[i];
+        Matrix state_change = calculate_state_change(comp);
+        Matrix j = calculate_jacobian(state_change, state.change_rate);
+
+        jacobians.push_back(j);
+    }
+
+    Matrix J = stack_matrix(jacobians); // 2N x 3 (rows x cols)
+    Matrix R = stack_vector(r);         // 2N x 1 (rows x cols)
+
+    Matrix Jt = J; // 3 x 2N
+    Jt.transpose();
+
+    Matrix A = Jt * J; // 3 x 3
+    Matrix b = Jt * R; // 3 x 1
+
+    b = b * -1;
+
+    Matrix delta = solve(A, b); // 3 x 1
+
+    Vec3d delta_vec = mat2vec(delta);
+
+    params = params - delta_vec;
 }
