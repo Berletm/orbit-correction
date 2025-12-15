@@ -1,6 +1,7 @@
 #include "correction.hpp"
 #include "model.hpp"
 #include "interpolation.hpp"
+#include "gauss.hpp"
 #include <cmath>
 #include <algorithm>
 
@@ -97,26 +98,45 @@ Matrix stack_vector(const std::vector<Celestial>& vecs)
 
 Matrix solve(const Matrix& A, const Matrix& b)
 {
+    Solver solver(A, b);
 
+    return solver.solve();
 }
 
-Matrix recompute_change_rate(
-    const Matrix& ref_state_change, 
-    double time_target, double time_ref, 
-    const std::vector<Object>& objects
-)
+Matrix interpolate_change_rate(const std::vector<Matrix>& trajectory, const std::vector<double>& times, double target_time)
 {
-    Matrix initial_state = ref_state_change;
-    
-    double dt = time_target - time_ref;
-    int steps = std::max(1, (int)std::ceil(std::abs(dt) / 1e-3));  // h = 1e-3
-    double step_dt = dt / steps;
+    std::vector<Vec3d> row_1, row_2, row_3;
 
-    std::vector<SystemState> states;
-    std::vector<std::vector<Object>> object_trajectories;
-    integrate(objects, states, object_trajectories, ref_state_change, dt, step_dt);
+    for(const auto& mat: trajectory)
+    {
+        row_1.push_back({mat.mat[0][0], mat.mat[0][1], mat.mat[0][2]});
+        row_2.push_back({mat.mat[1][0], mat.mat[1][1], mat.mat[1][2]});
+        row_3.push_back({mat.mat[2][0], mat.mat[2][1], mat.mat[2][2]});
+    }
 
-    return states.back().change_rate;
+    Interpolator row_1_interpolator(row_1, times);
+    Interpolator row_2_interpolator(row_2, times);
+    Interpolator row_3_interpolator(row_3, times);
+
+    Vec3d row_1_target = row_1_interpolator.interpolate(target_time);
+    Vec3d row_2_target = row_2_interpolator.interpolate(target_time);
+    Vec3d row_3_target = row_3_interpolator.interpolate(target_time);
+
+    Matrix res(3, 3);
+
+    res.mat[0][0] = row_1_target.x;
+    res.mat[0][1] = row_1_target.y;
+    res.mat[0][2] = row_1_target.z;
+
+    res.mat[1][0] = row_2_target.x;
+    res.mat[1][1] = row_2_target.y;
+    res.mat[1][2] = row_2_target.z;
+
+    res.mat[2][0] = row_3_target.x;
+    res.mat[2][1] = row_3_target.y;
+    res.mat[2][2] = row_3_target.z;
+
+    return res;
 }
 
 SystemState interpolate(const std::vector<std::vector<Object>>& object_trajectories, const std::vector<SystemState>& trajectory, double t)
@@ -125,6 +145,7 @@ SystemState interpolate(const std::vector<std::vector<Object>>& object_trajector
     std::vector<Vec3d> earth_trajectory;
     std::vector<Vec3d> sun_trajectory;
     std::vector<Vec3d> jupiter_trajectory;
+    std::vector<Matrix> rate_change;
     std::vector<double> times;
 
     for (const auto& state: trajectory)
@@ -134,6 +155,7 @@ SystemState interpolate(const std::vector<std::vector<Object>>& object_trajector
         jupiter_trajectory.push_back(state.positions[2]);
         earth_trajectory.push_back(state.positions[3]);
         times.push_back(state.time);
+        rate_change.push_back(state.change_rate);
     }
 
     Interpolator oumuamua_interpolator(oumuamua_trajectory, times);
@@ -147,33 +169,8 @@ SystemState interpolate(const std::vector<std::vector<Object>>& object_trajector
     res.positions.push_back(sun_interpolator.interpolate(t));
     res.positions.push_back(jupiter_interpolator.interpolate(t));
     res.positions.push_back(earth_interpolator.interpolate(t));
-    
-    int i;
-    for (i = 0; i < trajectory.size() - 1; ++i)
-    {
-        if (trajectory[i].time < t && trajectory[i + 1].time > t)
-        {
-            break;
-        }
-    }
 
-    int i_ref;
-
-    if (i > trajectory.size()) i_ref = trajectory.size() - 1;
-    else if (i == 0) i_ref = 0;
-    else i_ref = i - 1;
-
-    auto obj_copy = object_trajectories[i_ref];
-
-    for (int i = 0; i < obj_copy.size(); ++i)
-    {
-        Object& obj = obj_copy[i];
-        obj.position = res.positions[i];
-    }
-    
-    Matrix change_rate = recompute_change_rate(trajectory[i_ref].change_rate, t, trajectory[i_ref].time, obj_copy);
-
-    res.change_rate = change_rate;
+    res.change_rate = interpolate_change_rate(rate_change, times, t);
 
     return res;
 }

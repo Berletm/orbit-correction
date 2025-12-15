@@ -18,27 +18,27 @@ void Interpolator::calculate_spline_coef(const std::vector<Vec3d>& trajectory)
         {
             if (i == 0) 
             {
-                derivatives[i][0] = (trajectory[i + 1].x - trajectory[i][0]) / (time_points[i + 1] - time_points[i]);
-                derivatives[i][1] = (trajectory[i + 1].y - trajectory[i][1]) / (time_points[i + 1] - time_points[i]);
-                derivatives[i][2] = (trajectory[i + 1].z - trajectory[i][2]) / (time_points[i + 1] - time_points[i]);
+                derivatives[i][0] = (trajectory[i + 1].x - trajectory[i].x) / (times[i + 1] - times[i]);
+                derivatives[i][1] = (trajectory[i + 1].y - trajectory[i].y) / (times[i + 1] - times[i]);
+                derivatives[i][2] = (trajectory[i + 1].z - trajectory[i].z) / (times[i + 1] - times[i]);
             } 
             else if (i == n - 1) 
             {
-                derivatives[i][0] = (trajectory[i][0] - trajectory[i - 1][0]) / (time_points[i] - time_points[i - 1]);
-                derivatives[i][1] = (trajectory[i][1] - trajectory[i - 1][1]) / (time_points[i] - time_points[i - 1]);
-                derivatives[i][2] = (trajectory[i][2] - trajectory[i - 1][2]) / (time_points[i] - time_points[i - 1]);
+                derivatives[i][0] = (trajectory[i].x - trajectory[i - 1].x) / (times[i] - times[i - 1]);
+                derivatives[i][1] = (trajectory[i].y - trajectory[i - 1].y) / (times[i] - times[i - 1]);
+                derivatives[i][2] = (trajectory[i].z - trajectory[i - 1].z) / (times[i] - times[i - 1]);
             } 
             else 
             {
-                double dt_left = time_points[i] - time_points[i - 1];
-                double dt_right = time_points[i + 1] - time_points[i];
+                double dt_left = times[i] - times[i - 1];
+                double dt_right = times[i + 1] - times[i];
                 
-                derivatives[i][0] = ((trajectory[i][0] - trajectory[i - 1][0]) / dt_left + 
-                                    (trajectory[i + 1][0] - trajectory[i][0]) / dt_right) / 2;
-                derivatives[i][1] = ((trajectory[i][1] - trajectory[i - 1][1]) / dt_left + 
-                                    (trajectory[i + 1][1] - trajectory[i][1]) / dt_right) / 2;
-                derivatives[i][2] = ((trajectory[i][2] - trajectory[i - 1][2]) / dt_left + 
-                                    (trajectory[i + 1][2] - trajectory[i][2]) / dt_right) / 2;
+                derivatives[i][0] = ((trajectory[i].x - trajectory[i - 1].x) / dt_left + 
+                                    (trajectory[i + 1].x - trajectory[i].x) / dt_right) / 2;
+                derivatives[i][1] = ((trajectory[i].y - trajectory[i - 1].y) / dt_left + 
+                                    (trajectory[i + 1].y - trajectory[i].y) / dt_right) / 2;
+                derivatives[i][2] = ((trajectory[i].z - trajectory[i - 1].z) / dt_left + 
+                                    (trajectory[i + 1].z - trajectory[i].z) / dt_right) / 2;
             }
         }
         
@@ -48,18 +48,18 @@ void Interpolator::calculate_spline_coef(const std::vector<Vec3d>& trajectory)
             double dt2 = dt * dt;
             double dt3 = dt2 * dt;
 
-            segments[i].ax = trajectory[i].z;
-            segments[i].bx = derivatives[i].z;
-            segments[i].cx = (3 * (trajectory[i + 1][0] - trajectory[i][0]) / dt - 
+            segments[i].ax = trajectory[i].x;
+            segments[i].bx = derivatives[i][0];
+            segments[i].cx = (3 * (trajectory[i + 1].x - trajectory[i].x) / dt - 
                              2 * derivatives[i][0] - derivatives[i + 1][0]) / dt;
-            segments[i].dx = (2 * (trajectory[i][0] - trajectory[i + 1][0]) / dt + 
+            segments[i].dx = (2 * (trajectory[i].x - trajectory[i + 1].x) / dt + 
                              derivatives[i][0] + derivatives[i + 1][0]) / dt2;
             
-            segments[i].ay = trajectory[i][1];
+            segments[i].ay = trajectory[i].y;
             segments[i].by = derivatives[i][1];
-            segments[i].cy = (3 * (trajectory[i + 1][1] - trajectory[i][1]) / dt - 
+            segments[i].cy = (3 * (trajectory[i + 1].y - trajectory[i].y) / dt - 
                              2 * derivatives[i][1] - derivatives[i + 1][1]) / dt;
-            segments[i].dy = (2 * (trajectory[i][1] - trajectory[i + 1][1]) / dt + 
+            segments[i].dy = (2 * (trajectory[i].y - trajectory[i + 1].y) / dt + 
                              derivatives[i][1] + derivatives[i + 1][1]) / dt2;
             
             segments[i].az = trajectory[i].z;

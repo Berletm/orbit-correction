@@ -80,6 +80,5 @@ int main(int argc, char* argv[])
 {
     std::vector<Object> system = create_model_system();
 
-
     return 0;
 }
