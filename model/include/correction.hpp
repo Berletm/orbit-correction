@@ -29,5 +29,10 @@ void correction(
     const std::vector<Vec3d>& obs_position, 
     const std::vector<double>& obs_time);
 
+void read_observed_data(
+    std::vector<double>& time, 
+    std::vector<Vec3d>& observatories, 
+    std::vector<Celestial>& observed);
+
 
 #endif //CORRECTION_HPP

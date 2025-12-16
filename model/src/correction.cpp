@@ -4,6 +4,9 @@
 #include "gauss.hpp"
 #include <cmath>
 #include <algorithm>
+#include <fstream>
+#include <sstream>
+#include <iomanip>
 
 std::vector<Celestial> calculate_residuals(const std::vector<Celestial>& observed, const std::vector<Celestial>& computed)
 {
@@ -57,6 +60,32 @@ Matrix calculate_jacobian(const Matrix& state_change, const Matrix& change_rate)
     Matrix j = state_change * change_rate;
 
     return j;
+}
+
+void read_observed_data(std::vector<double>& time, std::vector<Vec3d>& observatories, std::vector<Celestial>& observed)
+{
+    std::ifstream file("../data/output.txt");
+    
+    if (!file.is_open()) return;
+
+    std::string line;
+
+    while (std::getline(file, line))
+    {
+        std::istringstream ss(line);
+
+        double t = 0;
+        Vec3d observatory(0, 0, 0);
+        Celestial obs(0, 0);
+
+        ss >> t >> obs.ra >> obs.dec >> observatory.x >> observatory.y >> observatory.z;
+
+        time.push_back(t);
+        observatories.push_back(observatory);
+        observed.push_back(obs);
+    }
+    
+    file.close();
 }
 
 Matrix stack_matrix(const std::vector<Matrix>& matrices)
@@ -186,71 +215,87 @@ Vec3d mat2vec(const Matrix& mat)
     return res;
 }
 
+void write_residuals(const std::vector<Celestial>& residuals, std::ofstream& file)
+{
+    file << std::setprecision(15);
+
+    for (const auto& r: residuals)
+    {
+        file << r.ra << " " << r.dec << "\n";
+    }
+    
+    file << "----------------------\n";
+}
+
 void correction(std::vector<Object>& initial_state, const std::vector<Celestial>& observed, const std::vector<Vec3d>& obs_position, const std::vector<double>& obs_time)
 {   
+    std::ofstream file("residuals.txt");
     Vec3d& params = initial_state[0].position;
 
     double t_end = *std::max_element(obs_time.begin(), obs_time.end());
 
-    std::vector<SystemState> states;
-    std::vector<std::vector<Object>> objects_trajectories;
-    Matrix change_rate_init(3);
-    change_rate_init.identity();
-    integrate(initial_state, states, objects_trajectories, change_rate_init, t_end, 1e-3);
-
-    std::vector<SystemState> states_at_measurements;
-
-    for (const auto& time: obs_time)
+    for (int i = 0; i < 5; ++i)
     {
-        SystemState state = interpolate(objects_trajectories, states, time);
-        states_at_measurements.push_back(state);
+        std::vector<SystemState> states;
+        std::vector<std::vector<Object>> objects_trajectories;
+        Matrix change_rate_init(3);
+        change_rate_init.identity();
+        integrate(initial_state, states, objects_trajectories, change_rate_init, t_end, 60*60*6);
+
+        std::vector<SystemState> states_at_measurements;
+
+        for (const auto& time: obs_time)
+        {
+            SystemState state = interpolate(objects_trajectories, states, time);
+            states_at_measurements.push_back(state);
+        }
+
+        std::vector<Vec3d> computed;
+        for (int i = 0; i < states_at_measurements.size(); ++i)
+        {
+            SystemState state = states_at_measurements[i];
+            Vec3d observatory_vec = obs_position[i]; 
+
+            Vec3d oumuamua_pos = state.positions[0];
+            Vec3d earth_pos    = state.positions[1];
+
+            Vec3d temp_vec     =  earth_pos + observatory_vec;
+
+            Vec3d computed_vec = oumuamua_pos - temp_vec; // not sure about operands order 
+            computed.push_back(computed_vec);
+        }
+
+        std::vector<Celestial> computed_angles = cart2celestial(computed);
+
+        std::vector<Celestial> r = calculate_residuals(observed, computed_angles);
+        write_residuals(r, file);
+
+        std::vector<Matrix> jacobians;
+
+        for (int i = 0; i < states_at_measurements.size(); ++i)
+        {
+            SystemState state = states_at_measurements[i];
+            Vec3d comp = computed[i];
+            Matrix state_change = calculate_state_change(comp);
+            Matrix j = calculate_jacobian(state_change, state.change_rate);
+
+            jacobians.push_back(j);
+        }
+
+        Matrix J = stack_matrix(jacobians); // 2N x 3 (rows x cols)
+        Matrix R = stack_vector(r);         // 2N x 1 (rows x cols)
+
+        Matrix Jt = J.transposed(); // 3 x 2N
+
+        Matrix A = Jt * J; // 3 x 3
+        Matrix b = Jt * R; // 3 x 1
+
+        b = b * -1;
+
+        Matrix delta = solve(A, b); // 3 x 1
+
+        Vec3d delta_vec = mat2vec(delta);
+
+        params = params - delta_vec;
     }
-
-    std::vector<Vec3d> computed;
-    for (int i = 0; i < states_at_measurements.size(); ++i)
-    {
-        SystemState state = states_at_measurements[i];
-        Vec3d observatory_vec = obs_position[i]; 
-
-        Vec3d oumuamua_pos = state.positions[0];
-        Vec3d earth_pos    = state.positions[1];
-
-        Vec3d temp_vec     =  earth_pos + observatory_vec;
-
-        Vec3d computed_vec = oumuamua_pos - temp_vec; // not sure about operands order 
-        computed.push_back(computed_vec);
-    }
-
-    std::vector<Celestial> computed_angles = cart2celestial(computed);
-
-    std::vector<Celestial> r = calculate_residuals(observed, computed_angles);
-
-    std::vector<Matrix> jacobians;
-
-    for (int i = 0; i < states_at_measurements.size(); ++i)
-    {
-        SystemState state = states_at_measurements[i];
-        Vec3d comp = computed[i];
-        Matrix state_change = calculate_state_change(comp);
-        Matrix j = calculate_jacobian(state_change, state.change_rate);
-
-        jacobians.push_back(j);
-    }
-
-    Matrix J = stack_matrix(jacobians); // 2N x 3 (rows x cols)
-    Matrix R = stack_vector(r);         // 2N x 1 (rows x cols)
-
-    Matrix Jt = J; // 3 x 2N
-    Jt.transpose();
-
-    Matrix A = Jt * J; // 3 x 3
-    Matrix b = Jt * R; // 3 x 1
-
-    b = b * -1;
-
-    Matrix delta = solve(A, b); // 3 x 1
-
-    Vec3d delta_vec = mat2vec(delta);
-
-    params = params - delta_vec;
 }

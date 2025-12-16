@@ -153,10 +153,10 @@ struct Matrix
         return res;
     }
 
-    inline void transpose()
+    inline Matrix transposed() const
     {
         Matrix res(this->cols, this->rows);
-
+        
         for (int i = 0; i < this->rows; ++i)
         {
             for (int j = 0; j < this->cols; ++j)
@@ -164,9 +164,8 @@ struct Matrix
                 res.mat[j][i] = this->mat[i][j];
             }
         }
-
-        mat = std::move(res.mat);
-        std::swap(rows, cols);
+        
+        return res;
     }
 };
 
@@ -179,35 +178,42 @@ struct SystemState
 
     SystemState(): change_rate(3), time(0) {}
 
-    SystemState operator+(const SystemState& other)
+    SystemState operator+(const SystemState& other) const
     {
-        SystemState res;
-        res.positions.resize(positions.size());
-        res.velocities.resize(velocities.size());
-        res.change_rate = this->change_rate + other.change_rate;
+        SystemState res = *this;
 
-        for (int i = 0; i < positions.size(); ++i)
+        for (size_t i = 0; i < positions.size(); ++i) 
         {
-            res.positions[i] = this->positions[i] + other.positions[i];
-            res.velocities[i] = this->velocities[i] + other.velocities[i];
+            res.positions[i] = positions[i] + other.positions[i];
         }
-
+        
+        for (size_t i = 0; i < velocities.size(); ++i) 
+        {
+            res.velocities[i] = velocities[i] + other.velocities[i];
+        }
+        
+        res.change_rate = change_rate + other.change_rate;
+        
         return res;
     }
 
-    SystemState operator*(double scalar)
+
+    SystemState operator*(double scalar) const
     {
-        SystemState res;
-        res.positions.resize(positions.size());
-        res.velocities.resize(velocities.size());
-        res.change_rate = this->change_rate * scalar;
-
-        for (int i = 0; i < positions.size(); ++i)
+        SystemState res = *this; 
+        
+        for (auto& pos : res.positions) 
         {
-            res.positions[i] = res.positions[i] * scalar;
-            res.velocities[i] = res.velocities[i] * scalar;
+            pos = pos * scalar;
         }
+        for (auto& vel : res.velocities) 
+        {
+            vel = vel * scalar;
+        }
+        
+        res.change_rate = change_rate * scalar;
 
+        
         return res;
     }
 

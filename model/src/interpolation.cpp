@@ -41,12 +41,17 @@ void Interpolator::calculate_spline_coef(const std::vector<Vec3d>& trajectory)
                                     (trajectory[i + 1].z - trajectory[i].z) / dt_right) / 2;
             }
         }
-        
+
+        segments.resize(n - 1);
+
         for (int i = 0; i < n - 1; i++) 
         {
             double dt = times[i + 1] - times[i];
             double dt2 = dt * dt;
             double dt3 = dt2 * dt;
+
+            segments[i].t_start = times[i];
+            segments[i].t_end = times[i + 1];
 
             segments[i].ax = trajectory[i].x;
             segments[i].bx = derivatives[i][0];

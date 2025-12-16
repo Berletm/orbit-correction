@@ -1,6 +1,7 @@
 #include "model.hpp"
 #include <fstream>
 #include <iostream>
+#include <iomanip>
 
 const std::vector<std::vector<double>> alpha =
 {
@@ -203,23 +204,38 @@ void init_state(std::vector<Object> objects, SystemState& state, const Matrix& c
     }
 }
 
+void write_state(const SystemState& state, std::ofstream& file)
+{
+    file << std::setprecision(15);
+    for (const auto& pos: state.positions)
+    {
+        file << pos.x << " " << pos.y << " " << pos.z << "|";
+    }
+
+    file << "\n";
+}
+
 void integrate(
     std::vector<Object> objects,
     std::vector<SystemState>& states,
     std::vector<std::vector<Object>>& objects_trajectories,
     const Matrix& change_rate_init, 
     double t, double dt)
-{
-    SystemState initial_state;
-    init_state(objects, initial_state, change_rate_init);
-    states.push_back(initial_state);
+{   
+    std::ofstream file("trajectory.txt");
+    SystemState current_state;
+    init_state(objects, current_state, change_rate_init);
+
+    states.push_back(current_state);
     objects_trajectories.push_back(objects);
 
     for (double time = 0.0; time <= t; time += dt)
     {
-        objects = dopri5(objects, initial_state, dt);
+        write_state(current_state, file);
+        objects = dopri5(objects, current_state, dt);
+        current_state.time = time + dt;
+
         objects_trajectories.push_back(objects);
-        initial_state.time = time;
-        states.push_back(initial_state);
+        states.push_back(current_state);
     }
 }

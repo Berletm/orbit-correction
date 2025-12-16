@@ -11,3 +11,5 @@ add_executable(orbit
 )
 
 target_include_directories(orbit PRIVATE include)
+target_compile_options(orbit PRIVATE -fsanitize=address -g)
+target_link_options(orbit PRIVATE -fsanitize=address -g)
