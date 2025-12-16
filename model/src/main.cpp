@@ -1,6 +1,7 @@
 #include <iostream>
 #include "model.hpp"
 #include "utils.hpp"
+#include "correction.hpp"
 
 
 std::vector<Object> create_model_system() 
@@ -20,50 +21,50 @@ std::vector<Object> create_model_system()
     Object oumuamua, sun, jupiter, earth;
 
     oumuamua.position = Vec3d(
-        4.576215229884559E+09, 
-        7.556775107045462E+08,    
-        1.897489304528461E+09
+        1.452674920249601E+08, 
+        7.476202044512266E+07,    
+        -1.071281870832360E+07
     ) * 1000;
     oumuamua.velocity = Vec3d(
-        2.486030535763478E+01, 
-        3.705938998982580E+00,
-        1.086798534442793E+01
+        4.483537051061160E+01,
+        1.039892688342698E+01,
+        1.433813590587155E+01
     ) * 1000;
     oumuamua.mass = 4 * 10e11;
 
     sun.position = Vec3d(
-        -1.351419336613188E+06,
-        -1.263853537870709E+04,
-        3.158480284404224E+04
+        3.348986030140055E+05,
+        8.546522676943250E+05,
+        -1.952911753764993E+04
     ) * 1000;
     sun.velocity = Vec3d(
-        2.076458379360649E-03,
-        -1.548435725926448E-02,
-        7.866164391471479E-05
+        -8.992512340765906E-03,
+        9.545307638330358E-03,
+        2.103021639645862E-04
     ) * 1000;
     sun.mass = SUN_MASS;
 
     jupiter.position = Vec3d(
-        -1.351419336613188E+06,
-        -1.263853537870709E+04,
-        3.158480284404224E+04
+        -6.876378394323186E+08,
+        -4.342916936111128E+08,
+        1.718173022009712E+07
     ) * 1000;
     jupiter.velocity = Vec3d(
-        2.076458379360649E-03,
-        -1.548435725926448E-02,
-        7.866164391471479E-05
+        6.823103108737919E+00,
+        -1.042433580371820E+01,
+        -1.092815489926169E-01
     ) * 1000;
     jupiter.mass = JUPITER_MASS;
 
     earth.position = Vec3d(
-        -1.351419336613188E+06,
-        -1.263853537870709E+04, 
-        3.158480284404224E+04
+        1.400225151174905E+08,
+        5.334382691880187E+07,
+        -2.224282551313937E+04
     ) * 1000;
     earth.velocity = Vec3d(
-        2.076458379360649E-03,
-        -1.548435725926448E-02,
-        7.866164391471479E-05
+        -1.096275218788954E+01,
+        2.779127096624116E+01,
+        -1.998546477564034E-03
     ) * 1000;
     earth.mass = EARTH_MASS;
 
@@ -80,11 +81,13 @@ int main(int argc, char* argv[])
 {
     std::vector<Object> system = create_model_system();
 
+    std::vector<Vec3d> observers;
+    std::vector<Celestial> observed;
+    std::vector<double> time;
 
-    double total_time = 366 * 24 * 3600;
-    double dt = 3600 * 24;
-
-    integrate(system, total_time, dt);
+    read_observed_data(time, observers, observed);
+    
+    correction(system, observed, observers, time);
 
     return 0;
 }

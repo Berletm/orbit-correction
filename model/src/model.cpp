@@ -1,6 +1,7 @@
 #include "model.hpp"
 #include <fstream>
 #include <iostream>
+#include <iomanip>
 
 const std::vector<std::vector<double>> alpha =
 {
@@ -40,26 +41,68 @@ std::vector<Vec3d> compute_accelerations(const std::vector<Object>& objects)
     return accelerations;
 }
 
+Matrix compute_change_rate(const std::vector<Object>& objects, const Matrix& change_rate)
+{
+    Matrix res = compute_gravitational_gradient(objects);
+
+    res = res * change_rate;
+
+    return res;
+}
+
+Matrix compute_gravitational_gradient(const std::vector<Object>& objects)
+{
+    Matrix res(3);
+    res.zeros();
+
+    Object oumuamua = objects[0];
+
+    for (int i = 1; i < objects.size(); ++i)
+    {
+        Object cur_obj = objects[i];
+
+        Vec3d radius = cur_obj.position - oumuamua.position;
+        double distance_sq = radius * radius;
+        double dist = sqrt(distance_sq);
+        
+        double general = (G * cur_obj.mass) / pow(dist, 5);
+
+        res.mat[0][0] += general * (-2 * pow(radius.x, 2) + pow(radius.y, 2) + pow(radius.z, 2));
+        res.mat[0][1] += general * (-3 * radius.x * radius.y);
+        res.mat[0][2] += general * (-3 * radius.x * radius.z);
+
+        // res.mat[1][0] += general * (-3 * radius.x * radius.y);
+        res.mat[1][1] += general * (pow(radius.x, 2) -2 * pow(radius.y, 2) + pow(radius.z, 2));
+        res.mat[1][2] += general * (-3 * radius.z * radius.y);
+
+        // res.mat[2][0] += general * (-3 * radius.x * radius.z);
+        // res.mat[2][1] += general * (-3 * radius.z * radius.y);
+        res.mat[2][2] += general * (pow(radius.x, 2) + pow(radius.y, 2) -2 * pow(radius.z, 2));
+    }
+    
+    res.mat[1][0] = res.mat[0][1];
+    res.mat[2][0] = res.mat[0][2];
+    res.mat[2][1] = res.mat[1][2];
+
+    return res;
+}
+
 SystemState derivative(const SystemState& state, const std::vector<Object>& objects)
 {
     SystemState deriv;
 
     deriv.positions = state.velocities;
 
-    deriv.velocities = compute_accelerations(objects);
+    deriv.velocities  = compute_accelerations(objects);
+
+    deriv.change_rate = compute_change_rate(objects, state.change_rate);
 
     return deriv;
 }
 
-std::vector<Object> dopri5(std::vector<Object> objects, double dt=1e-3)
+std::vector<Object> dopri5(std::vector<Object> objects, SystemState& state, double dt=1e-3)
 {
-    SystemState initial_state;
-
-    for (const auto& obj: objects)
-    {
-        initial_state.positions.push_back(obj.position);
-        initial_state.velocities.push_back(obj.velocity);
-    }
+    SystemState initial_state = state;
 
     SystemState k1 = derivative(initial_state, objects);
 
@@ -129,6 +172,18 @@ std::vector<Object> dopri5(std::vector<Object> objects, double dt=1e-3)
         ) * dt;
     }
 
+    result.change_rate = initial_state.change_rate + (
+                        k1.change_rate * b[0] +
+                        k2.change_rate * b[1] +
+                        k3.change_rate * b[2] +
+                        k4.change_rate * b[3] +
+                        k5.change_rate * b[4] +
+                        k6.change_rate * b[5] +
+                        k7.change_rate * b[6] 
+                    ) * dt;
+
+    state = result;
+    
     for (int i = 0; i < objects.size(); ++i)
     {
         objects[i].position = result.positions[i];
@@ -138,21 +193,49 @@ std::vector<Object> dopri5(std::vector<Object> objects, double dt=1e-3)
     return objects;
 }
 
-std::vector<Object> integrate(std::vector<Object> objects, double t, double dt)
+void init_state(std::vector<Object> objects, SystemState& state, const Matrix& change_rate_init)
 {
-    std::ofstream outfile("orbit_data.txt");
-    outfile << "time(s) earth_x(m) earth_y(m) earth_vx(m/s) earth_vy(m/s)\n";
+    state.change_rate = change_rate_init;
+
+    for (const auto& obj: objects)
+    {
+        state.positions.push_back(obj.position);
+        state.velocities.push_back(obj.velocity);
+    }
+}
+
+void write_state(const SystemState& state, std::ofstream& file)
+{
+    file << std::setprecision(15);
+    for (const auto& pos: state.positions)
+    {
+        file << pos.x << " " << pos.y << " " << pos.z << "|";
+    }
+
+    file << "\n";
+}
+
+void integrate(
+    std::vector<Object> objects,
+    std::vector<SystemState>& states,
+    std::vector<std::vector<Object>>& objects_trajectories,
+    const Matrix& change_rate_init, 
+    double t, double dt)
+{   
+    std::ofstream file("trajectory.txt");
+    SystemState current_state;
+    init_state(objects, current_state, change_rate_init);
+
+    states.push_back(current_state);
+    objects_trajectories.push_back(objects);
 
     for (double time = 0.0; time <= t; time += dt)
     {
-        outfile << time << " " 
-                << objects[0].position.x << " " 
-                << objects[0].position.y << " "
-                << objects[0].velocity.x << " "
-                << objects[0].velocity.y << "\n";
-        objects = dopri5(objects, dt);
-    }
+        write_state(current_state, file);
+        objects = dopri5(objects, current_state, dt);
+        current_state.time = time + dt;
 
-    outfile.close();
-    return objects;
+        objects_trajectories.push_back(objects);
+        states.push_back(current_state);
+    }
 }

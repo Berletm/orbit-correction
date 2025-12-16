@@ -203,11 +203,24 @@ def preproc_table(table: pd.DataFrame) -> pd.DataFrame:
     table.rename(columns={"magnitude_band": "weight"}, inplace=True)
     
     return table
-    
+
+def write_table(table: pd.DataFrame) -> None:
+    with open("output.txt", mode="w") as file:
+        time = table["date_tdb"].to_numpy()
+        ra, dec = table["right_ascension"].to_numpy(), table["declination"].to_numpy()  
+        x = table["x_obs"].to_numpy()
+        y = table["y_obs"].to_numpy()
+        z = table["z_obs"].to_numpy()
+        
+        for i in range(len(time)):
+            file.write(f"{time[i]:.10f} {ra[i]:.10f} {dec[i]:.10f} {x[i]:.10f} {y[i]:.10f} {z[i]:.10f}\n")
+
+        file.close()
+            
 def main() -> None:
     table = read_table()
     table = preproc_table(table)
-    
+    write_table(table)
     print(table)
 
 

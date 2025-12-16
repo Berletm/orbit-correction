@@ -174,8 +174,8 @@ We don't have any p or q parameters so differentiation much easier.
     \begin{array}{c}
     \begin{bmatrix}
         \frac{\partial{x}}{\partial{x}} \ \frac{\partial{x}}{\partial{y}} \ \frac{\partial{x}}{\partial{z}} \ \frac{\partial{x}}{\partial{v_x}} \ \frac{\partial{x}}{\partial{v_y}} \ \frac{\partial{x}}{\partial{v_z}} \\
-        \frac{\partial{y}}{\partial{y}} \ \frac{\partial{y}}{\partial{y}} \ \frac{\partial{y}}{\partial{z}} \ \frac{\partial{y}}{\partial{v_x}} \ \frac{\partial{y}}{\partial{v_y}} \ \frac{\partial{y}}{\partial{v_z}} \\
-        \frac{\partial{z}}{\partial{z}} \ \frac{\partial{z}}{\partial{z}} \ \frac{\partial{z}}{\partial{z}} \ \frac{\partial{z}}{\partial{v_x}} \ \frac{\partial{z}}{\partial{v_y}} \ \frac{\partial{z}}{\partial{v_z}} \\
+        \frac{\partial{y}}{\partial{x}} \ \frac{\partial{y}}{\partial{y}} \ \frac{\partial{y}}{\partial{z}} \ \frac{\partial{y}}{\partial{v_x}} \ \frac{\partial{y}}{\partial{v_y}} \ \frac{\partial{y}}{\partial{v_z}} \\
+        \frac{\partial{z}}{\partial{x}} \ \frac{\partial{z}}{\partial{y}} \ \frac{\partial{z}}{\partial{z}} \ \frac{\partial{z}}{\partial{v_x}} \ \frac{\partial{z}}{\partial{v_y}} \ \frac{\partial{z}}{\partial{v_z}} \\
     \end{bmatrix}
     \end{array} \frac{\partial{s}}{\partial{s_{0_j}}} = 
     \begin{array}{c}
@@ -185,9 +185,59 @@ We don't have any p or q parameters so differentiation much easier.
         0 & 0 & 1 & \cdots & 0
     \end{bmatrix}
     \end{array} \frac{\partial{s}}{\partial{s_{0_j}}}
-\end{aligned} 
+\end{aligned}
 \]
 
+\[
+    \begin{aligned}
+        \frac{\partial{s}}{\partial{s_{0_j}}} = 
+        \begin{array}{c}
+            \begin{bmatrix}
+                \frac{\partial{x}}{\partial{x_0}} & \frac{\partial{x}}{\partial{y_0}} & \frac{\partial{x}}{\partial{z_0}} \\
+                \frac{\partial{y}}{\partial{x_0}} & \frac{\partial{y}}{\partial{y_0}} & \frac{\partial{y}}{\partial{z_0}} \\
+                \frac{\partial{z}}{\partial{x_0}} & \frac{\partial{z}}{\partial{y_0}} & \frac{\partial{z}}{\partial{z_0}} \\ 
+            \end{bmatrix}
+        \end{array}
+    \end{aligned}
+\]
+
+\begin{subsection}
+{Cartesian to Right ascension \& Declination}
+    In our case we have $g(s(t)) = (ra(t) \ dec(t))$ which maps with Cartesian this way:
+
+    \[
+    \begin{aligned}
+    ra = atan2(y, x) \\ dec = atan2(z, \sqrt{(x^2 + y^2)})
+    \end{aligned}
+    \]
+
+    Therefore 
+    \[
+        \frac{\partial{g}}{\partial{s}} = 
+        \begin{array}{c}
+            \begin{bmatrix}
+                \frac{\partial{ra}}{\partial{x}}  & \frac{\partial{ra}}{\partial{y}}  & \frac{\partial{ra}}{\partial{z}}  & \frac{\partial{ra}}{\partial{v_x}}  & \frac{\partial{ra}}{\partial{v_y}}  & \frac{\partial{ra}}{\partial{v_z}} \\
+                \frac{\partial{dec}}{\partial{x}} & \frac{\partial{dec}}{\partial{y}} & \frac{\partial{dec}}{\partial{z}} & \frac{\partial{dec}}{\partial{v_x}} & \frac{\partial{dec}}{\partial{v_y}} & \frac{\partial{dec}}{\partial{v_z}} \\
+            \end{bmatrix}
+        \end{array} =
+        \begin{array}{c}
+            \begin{bmatrix}
+                \frac{\partial{ra}}{\partial{x}}  & \frac{\partial{ra}}{\partial{y}}  & \frac{\partial{ra}}{\partial{z}}  & 0 & 0 & 0 \\
+                \frac{\partial{dec}}{\partial{x}} & \frac{\partial{dec}}{\partial{y}} & \frac{\partial{dec}}{\partial{z}} & 0 & 0 & 0 \\
+            \end{bmatrix}
+        \end{array} =
+    \]
+    \[
+    = \begin{array}{c}
+            \begin{bmatrix}
+                -\frac{y}{x^2 + y^2}  & \frac{x}{x^2 + y^2}  & 0  \\
+                -\frac{xz}{\sqrt{(x^2 + y^2)}(x^2 + y^2 + z^2)} & -\frac{yz}{\sqrt{(x^2 + y^2)}(x^2 + y^2 + z^2)} & \frac{\sqrt{(x^2 + y^2)}}{x^2 + y^2 + z^2} 
+            \end{bmatrix}
+        \end{array}
+    \]
+\end{subsection}
+
+\pagebreak
 
 And now to find last component $Q(t) = \frac{\partial{s}}{\partial{s_{0_j}}}$ we need to integrate one more equation
 \[
