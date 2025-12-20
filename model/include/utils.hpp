@@ -202,7 +202,7 @@ struct SystemState
         }
         
         res.change_rate = change_rate + other.change_rate;
-        
+
         return res;
     }
 
@@ -221,7 +221,6 @@ struct SystemState
         }
         
         res.change_rate = change_rate * scalar;
-
         
         return res;
     }

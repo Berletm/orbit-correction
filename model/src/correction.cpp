@@ -56,9 +56,6 @@ std::vector<Celestial> cart2celestial(const std::vector<Vec3d>& coords)
         double ra  = std::atan2(current_coords.y, current_coords.x);
         double dec = std::atan2(current_coords.z, std::sqrt(current_coords.y * current_coords.y + current_coords.x * current_coords.x));
 
-        ra = std::fmod(ra, 2 * M_PI);
-        dec = std::fmod(dec, 2 * M_PI);
-
         Celestial current_angles(ra, dec);
         res.push_back(current_angles);
     }
@@ -70,10 +67,13 @@ Matrix calculate_state_change(const Vec3d& computed)
 {
     Matrix res(2, 3);
 
+    double dec = std::atan2(computed.z, std::sqrt(computed.y * computed.y + computed.x * computed.x));
+
     double general = pow(computed.x, 2) + pow(computed.y, 2);
     double dist_sq = computed * computed;
-    res.mat[0][0] = - computed.y / general;
-    res.mat[0][1] = computed.x / general;
+    double cos_dec = cos(dec);
+    res.mat[0][0] = - (computed.y / general) * cos_dec;
+    res.mat[0][1] = (computed.x / general) * cos_dec;
     res.mat[0][2] = 0;
 
     res.mat[1][0] = - computed.x * computed.z / (sqrt(general) * dist_sq);
@@ -149,7 +149,7 @@ Matrix stack_vector(const std::vector<Celestial>& vecs)
         int shift = i * 2;
         Celestial cur_vec = vecs[i];
 
-        res.mat[0 + shift][0] = cur_vec.ra; 
+        res.mat[0 + shift][0] = cur_vec.ra * cos(cur_vec.dec); 
         res.mat[1 + shift][0] = cur_vec.dec;
     }
 
@@ -265,7 +265,6 @@ void correction(std::vector<Object>& initial_state, const std::vector<Celestial>
     Vec3d params = initial_state[0].position;
 
     double t_end = *std::max_element(obs_time.begin(), obs_time.end());
-    // const double AU = 149597870700.0;
 
     for (int i = 0; i < 5; ++i)
     {   
@@ -274,9 +273,7 @@ void correction(std::vector<Object>& initial_state, const std::vector<Celestial>
 
         std::vector<SystemState> states;
         std::vector<std::vector<Object>> objects_trajectories;
-        Matrix change_rate_init(3);
-        change_rate_init.identity();
-        integrate(initial_state_copy, states, objects_trajectories, change_rate_init, t_end, 60*60*12); // step = 12 hours
+        integrate(initial_state_copy, states, objects_trajectories, t_end, 60*60*12); // step = 12 hours
 
         std::vector<Vec3d> computed_positions;
         std::vector<Matrix> computed_jacobians;
@@ -311,8 +308,6 @@ void correction(std::vector<Object>& initial_state, const std::vector<Celestial>
         Matrix delta = solve(A, b); // 3 x 1
         Vec3d delta_vec = mat2vec(delta);
 
-        params = params - delta_vec * 0.1;
-    }
-    
-    std::cout << params.x << " " << params.y << " "<< params.z << " \n";
+        params = params - delta_vec * 0.01;
+    }    
 }

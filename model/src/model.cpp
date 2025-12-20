@@ -193,10 +193,13 @@ std::vector<Object> dopri5(std::vector<Object> objects, SystemState& state, doub
     return objects;
 }
 
-void init_state(std::vector<Object> objects, SystemState& state, const Matrix& change_rate_init)
+void init_state(std::vector<Object> objects, SystemState& state)
 {
-    state.change_rate = change_rate_init;
+    Matrix identity(3);
+    identity.identity();
 
+    state.change_rate = identity;
+    
     for (const auto& obj: objects)
     {
         state.positions.push_back(obj.position);
@@ -219,12 +222,11 @@ void integrate(
     std::vector<Object> objects,
     std::vector<SystemState>& states,
     std::vector<std::vector<Object>>& objects_trajectories,
-    const Matrix& change_rate_init, 
     double t, double dt)
 {   
     std::ofstream file("trajectory.txt");
     SystemState current_state;
-    init_state(objects, current_state, change_rate_init);
+    init_state(objects, current_state);
 
     states.push_back(current_state);
     objects_trajectories.push_back(objects);

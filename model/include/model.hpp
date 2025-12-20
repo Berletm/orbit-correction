@@ -18,7 +18,6 @@ void integrate(
     std::vector<Object> objects,
     std::vector<SystemState>& states,
     std::vector<std::vector<Object>>& objects_trajectories,
-    const Matrix& change_rate_init, 
     double t, double dt);
 
 #endif // MODEL_HPP
