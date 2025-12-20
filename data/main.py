@@ -207,9 +207,10 @@ def write_table(table: pd.DataFrame) -> None:
         x = table["x_obs"].to_numpy()
         y = table["y_obs"].to_numpy()
         z = table["z_obs"].to_numpy()
+        weight = table["weight"].to_numpy()
         
         for i in range(len(time)):
-            file.write(f"{time[i]:.10f} {ra[i]:.10f} {dec[i]:.10f} {x[i]:.10f} {y[i]:.10f} {z[i]:.10f}\n")
+            file.write(f"{time[i]:.10f} {weight[i]:.10f} {ra[i]:.10f} {dec[i]:.10f} {x[i]:.10f} {y[i]:.10f} {z[i]:.10f}\n")
 
         file.close()
             

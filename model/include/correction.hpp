@@ -27,12 +27,16 @@ void correction(
     std::vector<Object>& initial_state, 
     const std::vector<Celestial>& observed, 
     const std::vector<Vec3d>& obs_position, 
-    const std::vector<double>& obs_time);
+    const std::vector<double>& obs_time,
+    const Matrix& weights
+);
 
 void read_observed_data(
     std::vector<double>& time, 
     std::vector<Vec3d>& observatories, 
-    std::vector<Celestial>& observed);
+    std::vector<Celestial>& observed,
+    Matrix& weights    
+);
 
 
 #endif //CORRECTION_HPP

@@ -90,14 +90,14 @@ Matrix calculate_jacobian(const Matrix& state_change, const Matrix& change_rate)
     return j;
 }
 
-void read_observed_data(std::vector<double>& time, std::vector<Vec3d>& observatories, std::vector<Celestial>& observed)
+void read_observed_data(std::vector<double>& time, std::vector<Vec3d>& observatories, std::vector<Celestial>& observed, Matrix& weights)
 {
     std::ifstream file("../data/output.txt");
     
     if (!file.is_open()) return;
 
     std::string line;
-
+    std::vector<double> temp;
     while (std::getline(file, line))
     {
         std::istringstream ss(line);
@@ -105,17 +105,31 @@ void read_observed_data(std::vector<double>& time, std::vector<Vec3d>& observato
         double t = 0;
         Vec3d observatory(0, 0, 0);
         Celestial obs(0, 0);
+        double weight = 1.0;
 
-        ss >> t >> obs.ra >> obs.dec >> observatory.x >> observatory.y >> observatory.z;
+        ss >> t >> weight >> obs.ra >> obs.dec >> observatory.x >> observatory.y >> observatory.z;
 
         obs.ra = angle2rad(obs.ra);
         obs.dec = angle2rad(obs.dec);
 
+        temp.push_back(weight);
         time.push_back(t);
         observatories.push_back(observatory);
         observed.push_back(obs);
     }
     
+    int n_obs = temp.size(); 
+    int n = 2 * n_obs;    
+
+    weights = Matrix(n, n);
+    weights.zeros();
+
+    for (int i = 0; i < n_obs; ++i)
+    {
+        weights.mat[2*i][2*i] = temp[i];
+        weights.mat[2*i + 1][2*i + 1] = temp[i];
+    }
+
     file.close();
 }
 
@@ -259,7 +273,7 @@ void write_residuals(const std::vector<Celestial>& residuals, std::ofstream& fil
     file << "----------------------\n";
 }
 
-void correction(std::vector<Object>& initial_state, const std::vector<Celestial>& observed, const std::vector<Vec3d>& obs_position, const std::vector<double>& obs_time)
+void correction(std::vector<Object>& initial_state, const std::vector<Celestial>& observed, const std::vector<Vec3d>& obs_position, const std::vector<double>& obs_time, const Matrix& weights)
 {   
     std::ofstream file("residuals.txt");
     Vec3d params = initial_state[0].position;
@@ -302,8 +316,8 @@ void correction(std::vector<Object>& initial_state, const std::vector<Celestial>
         Matrix R = stack_vector(r); // 2N x 1 (rows x cols)
 
         Matrix Jt = J.transposed(); // 3 x 2N
-        Matrix A = Jt * J; // 3 x 3
-        Matrix b = Jt * R; // 3 x 1
+        Matrix A = Jt * weights * J; // 3 x 3
+        Matrix b = Jt * weights * R; // 3 x 1
 
         Matrix delta = solve(A, b); // 3 x 1
         Vec3d delta_vec = mat2vec(delta);

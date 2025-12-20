@@ -84,10 +84,11 @@ int main(int argc, char* argv[])
     std::vector<Vec3d> observers;
     std::vector<Celestial> observed;
     std::vector<double> time;
+    Matrix weights(1, 1);
 
-    read_observed_data(time, observers, observed);
+    read_observed_data(time, observers, observed, weights);
     
-    correction(system, observed, observers, time);
+    correction(system, observed, observers, time, weights);
 
     // std::vector<SystemState> states;
     // std::vector<std::vector<Object>> objects_trajectories;
