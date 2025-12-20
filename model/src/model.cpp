@@ -61,7 +61,7 @@ Matrix compute_gravitational_gradient(const std::vector<Object>& objects)
     {
         Object cur_obj = objects[i];
 
-        Vec3d radius = cur_obj.position - oumuamua.position;
+        Vec3d radius = oumuamua.position - cur_obj.position;
         double distance_sq = radius * radius;
         double dist = sqrt(distance_sq);
         

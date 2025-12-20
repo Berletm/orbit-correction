@@ -70,6 +70,15 @@ struct Celestial
     {
         return Celestial(this->ra - other.ra, this->dec - other.dec);
     }
+
+    inline Celestial operator+(const double scalar) const
+    {
+        return Celestial(this->ra + scalar, this->dec + scalar);
+    }
+    inline Celestial operator-(const double scalar) const
+    {
+        return Celestial(this->ra - scalar, this->dec - scalar);
+    }
 };
 
 struct Matrix

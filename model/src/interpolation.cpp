@@ -1,5 +1,6 @@
 #include "interpolation.hpp"
 #include <stdexcept>
+#include <algorithm>
 
 Interpolator::Interpolator(
         const std::vector<Vec3d>& trajectory, 
@@ -10,116 +11,95 @@ Interpolator::Interpolator(
 
 void Interpolator::calculate_spline_coef(const std::vector<Vec3d>& trajectory)
 {
-        int n = trajectory.size();
-        
-        std::vector<std::vector<double>> derivatives(n, std::vector<double>(3));
-        
-        for (int i = 0; i < n; i++) 
+    int n = trajectory.size();
+
+    segments.resize(n - 1);
+    
+    auto solve_for_axis = [&](auto getter) 
+    {
+        std::vector<double> h(n - 1);
+        for (int i = 0; i < n - 1; ++i) h[i] = times[i+1] - times[i];
+
+        std::vector<double> diag(n), upper(n), lower(n), rhs(n);
+        std::vector<double> m(n);
+
+        diag[0] = 1.0; upper[0] = 0.0; rhs[0] = 0.0;
+        diag[n-1] = 1.0; lower[n-1] = 0.0; rhs[n-1] = 0.0;
+
+        for (int i = 1; i < n - 1; ++i)
         {
-            if (i == 0) 
-            {
-                derivatives[i][0] = (trajectory[i + 1].x - trajectory[i].x) / (times[i + 1] - times[i]);
-                derivatives[i][1] = (trajectory[i + 1].y - trajectory[i].y) / (times[i + 1] - times[i]);
-                derivatives[i][2] = (trajectory[i + 1].z - trajectory[i].z) / (times[i + 1] - times[i]);
-            } 
-            else if (i == n - 1) 
-            {
-                derivatives[i][0] = (trajectory[i].x - trajectory[i - 1].x) / (times[i] - times[i - 1]);
-                derivatives[i][1] = (trajectory[i].y - trajectory[i - 1].y) / (times[i] - times[i - 1]);
-                derivatives[i][2] = (trajectory[i].z - trajectory[i - 1].z) / (times[i] - times[i - 1]);
-            } 
-            else 
-            {
-                double dt_left = times[i] - times[i - 1];
-                double dt_right = times[i + 1] - times[i];
-                
-                derivatives[i][0] = ((trajectory[i].x - trajectory[i - 1].x) / dt_left + 
-                                    (trajectory[i + 1].x - trajectory[i].x) / dt_right) / 2;
-                derivatives[i][1] = ((trajectory[i].y - trajectory[i - 1].y) / dt_left + 
-                                    (trajectory[i + 1].y - trajectory[i].y) / dt_right) / 2;
-                derivatives[i][2] = ((trajectory[i].z - trajectory[i - 1].z) / dt_left + 
-                                    (trajectory[i + 1].z - trajectory[i].z) / dt_right) / 2;
-            }
+            lower[i] = h[i-1];
+            diag[i] = 2.0 * (h[i-1] + h[i]);
+            upper[i] = h[i];
+            
+            double f_left = (getter(trajectory[i]) - getter(trajectory[i-1])) / h[i-1];
+            double f_right = (getter(trajectory[i+1]) - getter(trajectory[i])) / h[i];
+            rhs[i] = 6.0 * (f_right - f_left);
         }
 
-        segments.resize(n - 1);
-
-        for (int i = 0; i < n - 1; i++) 
+        for (int i = 1; i < n; ++i) 
         {
-            double dt = times[i + 1] - times[i];
-            double dt2 = dt * dt;
-            double dt3 = dt2 * dt;
-
-            segments[i].t_start = times[i];
-            segments[i].t_end = times[i + 1];
-
-            segments[i].ax = trajectory[i].x;
-            segments[i].bx = derivatives[i][0];
-            segments[i].cx = (3 * (trajectory[i + 1].x - trajectory[i].x) / dt - 
-                             2 * derivatives[i][0] - derivatives[i + 1][0]) / dt;
-            segments[i].dx = (2 * (trajectory[i].x - trajectory[i + 1].x) / dt + 
-                             derivatives[i][0] + derivatives[i + 1][0]) / dt2;
-            
-            segments[i].ay = trajectory[i].y;
-            segments[i].by = derivatives[i][1];
-            segments[i].cy = (3 * (trajectory[i + 1].y - trajectory[i].y) / dt - 
-                             2 * derivatives[i][1] - derivatives[i + 1][1]) / dt;
-            segments[i].dy = (2 * (trajectory[i].y - trajectory[i + 1].y) / dt + 
-                             derivatives[i][1] + derivatives[i + 1][1]) / dt2;
-            
-            segments[i].az = trajectory[i].z;
-            segments[i].bz = derivatives[i][2];
-            segments[i].cz = (3 * (trajectory[i + 1].z - trajectory[i].z) / dt - 
-                             2 * derivatives[i][2] - derivatives[i + 1][2]) / dt;
-            segments[i].dz = (2 * (trajectory[i].z - trajectory[i + 1].z) / dt + 
-                             derivatives[i][2] + derivatives[i + 1][2]) / dt2;
+            double w = lower[i] / diag[i-1];
+            diag[i] -= w * upper[i-1];
+            rhs[i] -= w * rhs[i-1];
         }
+
+        m[n-1] = rhs[n-1] / diag[n-1];
+        for (int i = n - 2; i >= 0; --i) 
+        {
+            m[i] = (rhs[i] - upper[i] * m[i+1]) / diag[i];
+        }
+        return m;
+    };
+
+    auto mx = solve_for_axis([](const Vec3d& v) { return v.x; });
+    auto my = solve_for_axis([](const Vec3d& v) { return v.y; });
+    auto mz = solve_for_axis([](const Vec3d& v) { return v.z; });
+
+    for (int i = 0; i < n - 1; ++i) 
+    {
+        double h = times[i+1] - times[i];
+        segments[i].t_start = times[i];
+        segments[i].t_end = times[i+1];
+
+        segments[i].ax = trajectory[i].x;
+        segments[i].cx = mx[i] / 2.0;
+        segments[i].dx = (mx[i+1] - mx[i]) / (6.0 * h);
+        segments[i].bx = (trajectory[i+1].x - trajectory[i].x) / h - 
+                         (h * (2.0 * mx[i] + mx[i+1])) / 6.0;
+
+        segments[i].ay = trajectory[i].y;
+        segments[i].cy = my[i] / 2.0;
+        segments[i].dy = (my[i+1] - my[i]) / (6.0 * h);
+        segments[i].by = (trajectory[i+1].y - trajectory[i].y) / h - 
+                         (h * (2.0 * my[i] + my[i+1])) / 6.0;
+
+        segments[i].az = trajectory[i].z;
+        segments[i].cz = mz[i] / 2.0;
+        segments[i].dz = (mz[i+1] - mz[i]) / (6.0 * h);
+        segments[i].bz = (trajectory[i+1].z - trajectory[i].z) / h - 
+                         (h * (2.0 * mz[i] + mz[i+1])) / 6.0;
     }
+}
 
 Vec3d Interpolator::interpolate(double time)
-{   
-    if (time <= times.front()) 
+{
+    auto it = std::upper_bound(times.begin(), times.end(), time);
+    int idx;
+
+    if (it == times.begin()) idx = 0;
+    else if (it == times.end()) idx = segments.size() - 1;
+    else idx = std::distance(times.begin(), it) - 1;
+
+    const auto& seg = segments[idx];
+    double dt = time - seg.t_start;
+    
+    return 
     {
-        Vec3d res = {segments[0].ax, segments[0].ay, segments[0].az};
-        return res;
-    }
-
-    if (time >= times.back()) 
-    {
-        int last = segments.size() - 1;
-        double dt = time - segments[last].t_start;
-
-        Vec3d res = 
-        {
-            segments[last].ax + segments[last].bx * dt + segments[last].cx * dt * dt + segments[last].dx * dt * dt * dt,
-            segments[last].ay + segments[last].by * dt + segments[last].cy * dt * dt + segments[last].dy * dt * dt * dt,
-            segments[last].az + segments[last].bz * dt + segments[last].cz * dt * dt + segments[last].dz * dt * dt * dt
-        };
-
-        return res;
-    }
-
-    for (const auto& seg : segments) 
-    {
-        if (time >= seg.t_start && time <= seg.t_end) 
-        {
-            double dt = time - seg.t_start;
-            double dt2 = dt * dt;
-            double dt3 = dt2 * dt;
-            
-            Vec3d res =
-            {
-                seg.ax + seg.bx * dt + seg.cx * dt2 + seg.dx * dt3,
-                seg.ay + seg.by * dt + seg.cy * dt2 + seg.dy * dt3,
-                seg.az + seg.bz * dt + seg.cz * dt2 + seg.dz * dt3
-            };
-
-            return res;
-            
-        }
-    }
-
-    throw std::runtime_error("Time out of range");
+        seg.ax + dt * (seg.bx + dt * (seg.cx + dt * seg.dx)),
+        seg.ay + dt * (seg.by + dt * (seg.cy + dt * seg.dy)),
+        seg.az + dt * (seg.bz + dt * (seg.cz + dt * seg.dz))
+    };
 }
 
 

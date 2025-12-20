@@ -30,7 +30,7 @@ std::vector<Object> create_model_system()
         1.039892688342698E+01,
         1.433813590587155E+01
     ) * 1000;
-    oumuamua.mass = 4 * 10e11;
+    oumuamua.mass = 1e11;
 
     sun.position = Vec3d(
         3.348986030140055E+05,
@@ -88,6 +88,13 @@ int main(int argc, char* argv[])
     read_observed_data(time, observers, observed);
     
     correction(system, observed, observers, time);
+
+    // std::vector<SystemState> states;
+    // std::vector<std::vector<Object>> objects_trajectories;
+    // Matrix change_rate_init(3);
+    // change_rate_init.identity();
+    // system[0].position = Vec3d(-1.29024e+55, -3.66654e+54, 2.28563e+53);
+    // integrate(system, states, objects_trajectories, change_rate_init, 365*24*60*60, 60*60*24); // step = 6 hours
 
     return 0;
 }

@@ -3,23 +3,20 @@ import numpy as np
 from astropy.time import Time
 
 
-def obs2cart(obs_time: Time, long: float, cos: float, sin: float, r: float = 6371.0) -> tuple[float, float, float]:
-    # ITRS coordinates (Earth-fixed)
+def obs2cart(obs_time: Time, long: float, cos: float, sin: float, r: float = 6371000.0) -> np.array:
     long_rad = np.deg2rad(long)
-    X = cos * np.cos(long_rad)
-    Y = cos * np.sin(long_rad)
-    Z = sin
+    X = cos * r * np.cos(long_rad)
+    Y = cos * r * np.sin(long_rad)
+    Z = sin * r
     
-    # Greenwich Sidereal Time (radians)
     gst = np.deg2rad(obs_time.sidereal_time('mean', 'greenwich').value * 15.0)
     
-    # Rotate from ITRS to GCRS (rotate by -gst around Z-axis)
     cos_gst, sin_gst = np.cos(gst), np.sin(gst)
-    x = X * cos_gst + Y * sin_gst
-    y = -X * sin_gst + Y * cos_gst
+    x = X * cos_gst - Y * sin_gst
+    y = X * sin_gst + Y * cos_gst
     z = Z
     
-    return np.array([x, y, z]) * r
+    return np.array([x, y, z])
 
 def celestial2cart(ra: float, dec: float) -> tuple[float, float, float]:
     ra_rad  = np.radians(ra)
@@ -32,7 +29,7 @@ def celestial2cart(ra: float, dec: float) -> tuple[float, float, float]:
     return x, y, z
 
 def cart2celestial(x: float, y: float, z: float) -> tuple[float, float]:
-    dec_rad = np.arctan2(z, np.sqrt(x**2 + y**2)) # mb wrong -> arcsin(z)
+    dec_rad = np.arctan2(z, np.sqrt(x**2 + y**2))
     dec = np.degrees(dec_rad)
     
     ra_rad = np.arctan2(y, x) # [-pi; +pi]
@@ -78,7 +75,6 @@ def dec2angle(dec: str) -> float:
     hours, mins, secs = dec.split()
     
     angle = float(hours) + (float(mins) / 60) + (float(secs) / 3600) # to hours
-    angle *= 15 # to angle, 1 hour = 15 degree
     
     angle *= sign
 
